@@ -10,17 +10,21 @@ export default function Page() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string>('');
-  const [copiedFinal, setCopiedFinal] = useState(false);
   const [copiedJson, setCopiedJson] = useState(false);
-  const [showJson, setShowJson] = useState(false);
+  const [copiedFinal, setCopiedFinal] = useState(false);
 
   const finalRef = useRef<HTMLDivElement | null>(null);
 
   const exampleByPreset: Record<PresetKey, string> = {
     sweepy:
-      'Sweepy sendirian di sungai mencari ikan kecil. Tiba-tiba buaya muncul mendekat. Sweepy refleks ambil kayu dan memukul buaya itu, lalu buaya kabur.',
+      '@mockey.mo (Sweepy) nonton film horor, sosok di TV makin mendekat, Sweepy gebuk TV pakai remote, suasana lucu tapi tegang',
     hanz26:
-      '@hanz26 duduk santai seperti UGC, cerita singkat dengan ekspresi natural, vibe relatable, lighting bagus, soft selling halus.',
+      '@hanz26 duduk santai seperti UGC, cerita singkat dengan ekspresi natural, vibe relatable, lighting bagus, soft selling halus',
+  };
+
+  const presetLabel: Record<PresetKey, { title: string; sub: string; emoji: string }> = {
+    sweepy: { title: 'Sweepy', sub: '@mockey.mo', emoji: '🐵' },
+    hanz26: { title: '@hanz26', sub: 'AI version', emoji: '🧑' },
   };
 
   const canSubmit = prompt.trim().length > 0 && !loading;
@@ -34,17 +38,13 @@ export default function Page() {
     }
   }, [result]);
 
-  const finalPrompt: string = useMemo(() => {
-    return String(result?.output?.finalPrompt ?? '');
+  const finalPrompt = useMemo(() => {
+    // backend kamu: result.output.finalPrompt
+    return result?.output?.finalPrompt ? String(result.output.finalPrompt) : '';
   }, [result]);
 
-  function toast(setter: (v: boolean) => void) {
-    setter(true);
-    setTimeout(() => setter(false), 1200);
-  }
-
-  async function onGenerate() {
-    const p = prompt.trim();
+  async function generateWithText(text: string) {
+    const p = text.trim();
     if (!p) {
       setErr('Prompt tidak boleh kosong.');
       return;
@@ -60,6 +60,7 @@ export default function Page() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // kirim preset juga (kalau backend kamu sudah baca preset)
         body: JSON.stringify({ prompt: p, preset }),
       });
 
@@ -75,7 +76,6 @@ export default function Page() {
 
       setResult(data);
 
-      // UX: auto scroll ke Final Prompt biar user langsung "Copy ke Sora"
       setTimeout(() => {
         finalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 150);
@@ -86,45 +86,42 @@ export default function Page() {
     }
   }
 
-  async function copyText(text: string, onOk: () => void) {
-    if (!text) return;
+  async function onGenerate() {
+    await generateWithText(prompt);
+  }
+
+  async function onCopyJson() {
+    if (!prettyResult) return;
     try {
-      await navigator.clipboard.writeText(text);
-      onOk();
+      await navigator.clipboard.writeText(prettyResult);
+      setCopiedJson(true);
+      setTimeout(() => setCopiedJson(false), 1200);
     } catch {
-      // fallback
-      try {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        onOk();
-      } catch {
-        // no-op
-      }
+      // no-op
     }
   }
 
   async function onCopyFinal() {
-    await copyText(finalPrompt, () => toast(setCopiedFinal));
+    if (!finalPrompt) return;
+    try {
+      await navigator.clipboard.writeText(finalPrompt);
+      setCopiedFinal(true);
+      setTimeout(() => setCopiedFinal(false), 1200);
+    } catch {
+      // no-op
+    }
   }
 
-  async function onCopyJson() {
-    await copyText(prettyResult, () => toast(setCopiedJson));
-  }
-
-  function onUseExample() {
-    setPrompt(exampleByPreset[preset]);
+  function onUseExampleAuto() {
+    const ex = exampleByPreset[preset];
+    setPrompt(ex);
     setErr('');
+    generateWithText(ex); // auto-generate
   }
 
   function onClear() {
     setPrompt('');
     setErr('');
-    setResult(null);
-    setShowJson(false);
   }
 
   const S = styles;
@@ -151,59 +148,51 @@ export default function Page() {
           </div>
         </header>
 
-        {/* Prompt Card */}
+        {/* Card: Prompt */}
         <section style={S.card}>
           <div style={S.cardHead}>
             <div>
               <div style={S.cardTitle}>Prompt</div>
               <div style={S.cardHint}>
-                Pilih preset karakter, lalu tulis ide singkat. Sistem akan buat storyboard + <b>finalPrompt</b> untuk kamu paste ke Sora.
+                Pilih preset karakter, lalu tulis ide singkat. Sistem akan buat storyboard + finalPrompt untuk kamu paste ke Sora.
               </div>
             </div>
 
             <button
               type="button"
               style={{ ...S.smallBtn, opacity: loading ? 0.6 : 1 }}
-              onClick={onUseExample}
+              onClick={onUseExampleAuto}
               disabled={loading}
+              title="Isi contoh + generate otomatis"
             >
-              Pakai contoh
+              {loading ? 'Generating…' : 'Pakai contoh'}
             </button>
           </div>
 
-          {/* Preset Toggle */}
+          {/* Preset toggle */}
           <div style={S.presetRow}>
-            <button
-              type="button"
-              onClick={() => setPreset('sweepy')}
-              style={{
-                ...S.presetBtn,
-                ...(preset === 'sweepy' ? S.presetBtnActive : null),
-              }}
-              disabled={loading}
-            >
-              <div style={S.presetTop}>
-                <span style={S.presetIcon}>🐵</span>
-                <span style={S.presetName}>Sweepy</span>
-              </div>
-              <div style={S.presetSub}>@mockey.mo</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPreset('hanz26')}
-              style={{
-                ...S.presetBtn,
-                ...(preset === 'hanz26' ? S.presetBtnActive : null),
-              }}
-              disabled={loading}
-            >
-              <div style={S.presetTop}>
-                <span style={S.presetIcon}>🧑</span>
-                <span style={S.presetName}>@hanz26</span>
-              </div>
-              <div style={S.presetSub}>AI version</div>
-            </button>
+            {(['sweepy', 'hanz26'] as PresetKey[]).map((k) => {
+              const active = preset === k;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setPreset(k)}
+                  disabled={loading}
+                  style={{
+                    ...S.presetBtn,
+                    ...(active ? S.presetBtnActive : null),
+                    opacity: loading ? 0.75 : 1,
+                  }}
+                >
+                  <div style={S.presetTop}>
+                    <span style={S.presetEmoji}>{presetLabel[k].emoji}</span>
+                    <span style={S.presetTitle}>{presetLabel[k].title}</span>
+                  </div>
+                  <div style={S.presetSub}>{presetLabel[k].sub}</div>
+                </button>
+              );
+            })}
           </div>
 
           <textarea
@@ -214,26 +203,24 @@ export default function Page() {
               if (err) setErr('');
             }}
             placeholder={`Contoh:\n"${exampleByPreset[preset]}"`}
-            rows={6}
+            rows={7}
           />
 
-          {/* helper row */}
-          <div style={S.helperRow}>
-            <div style={S.helperLeft}>
-              <span style={S.helperLabel}>Preset aktif:</span>{' '}
-              <b style={{ opacity: 0.95 }}>
-                {preset === 'sweepy' ? 'Sweepy (@mockey.mo)' : '@hanz26 (AI version)'}
-              </b>
+          <div style={S.miniRow}>
+            <div style={S.miniLeft}>
+              <div style={S.miniText}>
+                Preset aktif: <span style={S.miniStrong}>{presetLabel[preset].sub === '@mockey.mo' ? 'Sweepy (@mockey.mo)' : '@hanz26 (AI version)'}</span>
+              </div>
             </div>
-            <div style={S.helperRight}>
-              <span style={S.counter}>{prompt.trim().length} chars</span>
-              <button type="button" onClick={onClear} style={S.linkBtn} disabled={loading && !prompt}>
+
+            <div style={S.miniRight}>
+              <span style={S.charCount}>{prompt.length} chars</span>
+              <button type="button" onClick={onClear} disabled={loading || prompt.length === 0} style={S.linkBtn}>
                 Clear
               </button>
             </div>
           </div>
 
-          {/* Actions */}
           <div style={S.actionsRow}>
             <button
               type="button"
@@ -253,14 +240,14 @@ export default function Page() {
                 Endpoint: <code style={S.code}>POST /api/generate</code>
               </div>
               <div style={S.metaLine}>
-                Preset payload: <code style={S.code}>preset="{preset}"</code>
+                Preset payload: <code style={S.code}>preset="{preset === 'sweepy' ? 'sweepy' : 'hanz26'}"</code>
               </div>
               {err ? <div style={S.errorText}>{err}</div> : null}
             </div>
           </div>
         </section>
 
-        {/* Final Prompt Card */}
+        {/* Card: Final Prompt */}
         <section style={S.card} ref={finalRef}>
           <div style={S.cardHead}>
             <div>
@@ -285,60 +272,51 @@ export default function Page() {
           <div style={S.resultBox}>
             {!finalPrompt && !loading ? <div style={S.emptyState}>Belum ada hasil. Tekan Generate dulu.</div> : null}
             {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
-            {finalPrompt ? <pre style={{ ...S.pre, fontSize: 13 }}>{finalPrompt}</pre> : null}
+            {finalPrompt ? <pre style={S.pre}>{finalPrompt}</pre> : null}
           </div>
         </section>
 
-        {/* JSON Card (collapsible) */}
+        {/* Card: Response JSON */}
         <section style={S.card}>
           <div style={S.cardHead}>
             <div>
-              <div style={S.cardTitle}>Response JSON</div>
-              <div style={S.cardHint}>Opsional. Kalau butuh detail storyboard, buka bagian ini.</div>
+              <div style={S.cardTitle}>Response (JSON)</div>
+              <div style={S.cardHint}>Kalau mau edit/inspect storyboard, copy JSON-nya.</div>
             </div>
 
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                type="button"
-                onClick={() => setShowJson((v) => !v)}
-                style={S.smallBtn}
-                disabled={!result}
-              >
-                {showJson ? 'Hide JSON' : 'Show JSON'}
-              </button>
-              <button
-                type="button"
-                onClick={onCopyJson}
-                disabled={!prettyResult}
-                style={{
-                  ...S.smallBtn,
-                  opacity: prettyResult ? 1 : 0.5,
-                  cursor: prettyResult ? 'pointer' : 'not-allowed',
-                }}
-              >
-                {copiedJson ? 'Copied ✅' : 'Copy JSON'}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onCopyJson}
+              disabled={!prettyResult}
+              style={{
+                ...S.smallBtn,
+                opacity: prettyResult ? 1 : 0.5,
+                cursor: prettyResult ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {copiedJson ? 'Copied ✅' : 'Copy JSON'}
+            </button>
           </div>
 
-          {showJson ? (
-            <div style={S.resultBox}>
-              {!result && !loading && !err ? <div style={S.emptyState}>Belum ada hasil.</div> : null}
-              {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
-              {result ? <pre style={S.pre}>{prettyResult}</pre> : null}
-            </div>
-          ) : (
-            <div style={S.collapsedHint}>
-              {result ? 'JSON tersedia. Tap “Show JSON” bila perlu.' : 'Belum ada JSON.'}
-            </div>
-          )}
+          <div style={S.resultBox}>
+            {!result && !loading && !err ? <div style={S.emptyState}>Belum ada hasil.</div> : null}
+            {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
+            {result ? <pre style={S.pre}>{prettyResult}</pre> : null}
+            {err ? (
+              <div style={S.errorBox}>
+                <div style={S.errorTitle}>Error</div>
+                <div style={S.errorMsg}>{err}</div>
+              </div>
+            ) : null}
+          </div>
 
           <div style={S.footerNote}>
-            Tips: test endpoint di browser, buka <code style={S.code}>/api/generate</code> (GET) hanya cek hidup. Generate beneran via POST tombol.
+            Tips: untuk test endpoint di browser, buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup.
+            Generate beneran pakai POST dari tombol.
           </div>
         </section>
 
-        <div style={S.bottomSpace} />
+        <div style={S.bottomPad} />
       </main>
     </div>
   );
@@ -363,10 +341,19 @@ const styles: Record<string, React.CSSProperties> = {
     filter: 'blur(6px)',
     pointerEvents: 'none',
   },
-  container: { maxWidth: 860, margin: '0 auto', position: 'relative' },
-
-  header: { marginBottom: 14 },
-  brandRow: { display: 'flex', gap: 12, alignItems: 'center' },
+  container: {
+    maxWidth: 860,
+    margin: '0 auto',
+    position: 'relative',
+  },
+  header: {
+    marginBottom: 14,
+  },
+  brandRow: {
+    display: 'flex',
+    gap: 12,
+    alignItems: 'center',
+  },
   logoDot: {
     width: 14,
     height: 14,
@@ -375,10 +362,24 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 0 24px rgba(76,245,219,0.28)',
     flexShrink: 0,
   },
-  title: { margin: 0, fontSize: 34, letterSpacing: 1.2, lineHeight: 1.05, fontWeight: 800 },
-  subtitle: { margin: '6px 0 0', opacity: 0.72, fontSize: 14 },
-
-  badgeRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 },
+  title: {
+    margin: 0,
+    fontSize: 34,
+    letterSpacing: 1.2,
+    lineHeight: 1.05,
+    fontWeight: 800,
+  },
+  subtitle: {
+    margin: '6px 0 0',
+    opacity: 0.72,
+    fontSize: 14,
+  },
+  badgeRow: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginTop: 10,
+  },
   badge: {
     fontSize: 12,
     padding: '6px 10px',
@@ -387,7 +388,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,255,255,0.10)',
     opacity: 0.9,
   },
-
   card: {
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.10)',
@@ -405,9 +405,17 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'flex-start',
     marginBottom: 12,
   },
-  cardTitle: { fontSize: 16, fontWeight: 800, marginBottom: 4 },
-  cardHint: { fontSize: 12, opacity: 0.72, lineHeight: 1.35, maxWidth: 560 },
-
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: 800,
+    marginBottom: 4,
+  },
+  cardHint: {
+    fontSize: 12,
+    opacity: 0.72,
+    lineHeight: 1.35,
+    maxWidth: 560,
+  },
   presetRow: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
@@ -416,26 +424,39 @@ const styles: Record<string, React.CSSProperties> = {
   },
   presetBtn: {
     textAlign: 'left',
-    padding: '12px 12px',
+    padding: 12,
     borderRadius: 16,
-    border: '1px solid rgba(255,255,255,0.10)',
+    border: '1px solid rgba(255,255,255,0.12)',
     background: 'rgba(255,255,255,0.04)',
-    color: 'rgba(255,255,255,0.90)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+    color: 'rgba(255,255,255,0.92)',
   },
   presetBtnActive: {
     border: '1px solid rgba(76,245,219,0.35)',
-    background: 'linear-gradient(90deg, rgba(76,245,219,0.15), rgba(106,169,255,0.10))',
+    background: 'linear-gradient(90deg, rgba(76,245,219,0.18), rgba(106,169,255,0.12))',
+    boxShadow: '0 10px 24px rgba(0,0,0,0.22)',
   },
-  presetTop: { display: 'flex', alignItems: 'center', gap: 10 },
-  presetIcon: { fontSize: 16 },
-  presetName: { fontWeight: 900, fontSize: 14 },
-  presetSub: { marginTop: 4, fontSize: 12, opacity: 0.75 },
-
+  presetTop: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 6,
+  },
+  presetEmoji: {
+    fontSize: 18,
+  },
+  presetTitle: {
+    fontWeight: 900,
+    fontSize: 15,
+    letterSpacing: 0.2,
+  },
+  presetSub: {
+    fontSize: 12,
+    opacity: 0.78,
+  },
   textarea: {
     width: '100%',
     resize: 'vertical',
-    minHeight: 120,
+    minHeight: 140,
     padding: '12px 12px',
     borderRadius: 14,
     background: 'rgba(0,0,0,0.35)',
@@ -443,11 +464,10 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'rgba(255,255,255,0.92)',
     outline: 'none',
     fontSize: 14,
-    lineHeight: 1.5,
+    lineHeight: 1.55,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
   },
-
-  helperRow: {
+  miniRow: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -455,19 +475,19 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 10,
     flexWrap: 'wrap',
   },
-  helperLeft: { fontSize: 12, opacity: 0.85 },
-  helperLabel: { opacity: 0.75 },
-  helperRight: { display: 'flex', alignItems: 'center', gap: 10 },
-  counter: { fontSize: 12, opacity: 0.65 },
+  miniLeft: { flex: 1 },
+  miniRight: { display: 'flex', alignItems: 'center', gap: 10 },
+  miniText: { fontSize: 12, opacity: 0.78 },
+  miniStrong: { fontWeight: 800, opacity: 1 },
+  charCount: { fontSize: 12, opacity: 0.78 },
   linkBtn: {
-    fontSize: 12,
-    fontWeight: 800,
     background: 'transparent',
     border: 'none',
-    color: 'rgba(76,245,219,0.90)',
-    padding: 0,
+    color: 'rgba(76,245,219,0.95)',
+    fontWeight: 800,
+    cursor: 'pointer',
+    padding: 6,
   },
-
   actionsRow: {
     display: 'flex',
     gap: 12,
@@ -494,11 +514,19 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,255,255,0.12)',
     background: 'rgba(255,255,255,0.06)',
     color: 'rgba(255,255,255,0.9)',
-    fontWeight: 800,
+    fontWeight: 900,
     fontSize: 13,
+    whiteSpace: 'nowrap',
   },
-  metaRight: { flex: 1, minWidth: 220 },
-  metaLine: { fontSize: 12, opacity: 0.75, marginTop: 2 },
+  metaRight: {
+    flex: 1,
+    minWidth: 220,
+  },
+  metaLine: {
+    fontSize: 12,
+    opacity: 0.75,
+    marginTop: 4,
+  },
   code: {
     fontSize: 12,
     padding: '2px 6px',
@@ -506,8 +534,12 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(255,255,255,0.07)',
     border: '1px solid rgba(255,255,255,0.10)',
   },
-  errorText: { marginTop: 8, fontSize: 12, color: 'rgba(255,120,120,0.95)', fontWeight: 800 },
-
+  errorText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: 'rgba(255,120,120,0.95)',
+    fontWeight: 900,
+  },
   resultBox: {
     background: 'rgba(0,0,0,0.35)',
     border: '1px solid rgba(255,255,255,0.10)',
@@ -521,19 +553,38 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
     fontSize: 12,
-    lineHeight: 1.55,
+    lineHeight: 1.6,
     color: 'rgba(255,255,255,0.92)',
   },
-  emptyState: { fontSize: 13, opacity: 0.65 },
-  loadingState: { fontSize: 13, opacity: 0.85 },
-
-  collapsedHint: {
+  emptyState: {
+    fontSize: 13,
+    opacity: 0.65,
+  },
+  loadingState: {
+    fontSize: 13,
+    opacity: 0.85,
+  },
+  errorBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 12,
+    border: '1px solid rgba(255,120,120,0.35)',
+    background: 'rgba(255,120,120,0.08)',
+  },
+  errorTitle: {
+    fontWeight: 900,
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  errorMsg: {
+    fontSize: 12,
+    opacity: 0.9,
+  },
+  footerNote: {
+    marginTop: 10,
     fontSize: 12,
     opacity: 0.7,
-    padding: '8px 2px 2px',
+    lineHeight: 1.4,
   },
-
-  footerNote: { marginTop: 10, fontSize: 12, opacity: 0.7, lineHeight: 1.4 },
-
-  bottomSpace: { height: 10 },
+  bottomPad: { height: 12 },
 };
