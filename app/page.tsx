@@ -2,7 +2,11 @@
 
 import React, { useMemo, useState } from 'react';
 
+type PresetKey = 'sweepy' | 'hanz26';
+
 export default function Page() {
+  const [activePreset, setActivePreset] = useState<PresetKey>('sweepy');
+
   const [prompt, setPrompt] = useState('');
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -10,8 +14,13 @@ export default function Page() {
   const [copiedJson, setCopiedJson] = useState(false);
   const [copiedFinal, setCopiedFinal] = useState(false);
 
+  const examplePromptSweepy =
+    'Sweepy (@mockey.mo) nonton film horor, sosok di TV makin mendekat, Sweepy gebuk TV pakai remote, suasana lucu tapi tegang';
+  const examplePromptHanz =
+    '@hanz26 duduk santai seperti UGC, bercerita singkat dengan ekspresi natural, cinematic lighting, vibe relatable';
+
   const examplePrompt =
-    'Sweepy nonton film horor, sosok di TV makin mendekat, Sweepy gebuk TV pakai remote, suasana lucu tapi tegang';
+    activePreset === 'sweepy' ? examplePromptSweepy : examplePromptHanz;
 
   const canSubmit = prompt.trim().length > 0 && !loading;
 
@@ -35,6 +44,37 @@ export default function Page() {
     return typeof fp === 'string' ? fp : '';
   }, [result]);
 
+  async function safeCopy(text: string) {
+    if (!text) return false;
+
+    // Clipboard modern
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {}
+
+    // Fallback (hanya di browser)
+    try {
+      if (typeof window === 'undefined' || typeof document === 'undefined')
+        return false;
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      ta.style.top = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function onGenerate() {
     const p = prompt.trim();
     if (!p) {
@@ -44,13 +84,16 @@ export default function Page() {
 
     setErr('');
     setResult(null);
+    setCopiedJson(false);
+    setCopiedFinal(false);
     setLoading(true);
 
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: p }),
+        // Kirim preset ke backend (kalau backend belum pakai, tidak apa-apa)
+        body: JSON.stringify({ prompt: p, preset: activePreset }),
       });
 
       const data = await res.json().catch(() => null);
@@ -68,36 +111,6 @@ export default function Page() {
       setErr(e?.message || 'Terjadi error.');
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function safeCopy(text: string) {
-    if (!text) return false;
-
-    // clipboard modern
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        return true;
-      }
-    } catch {}
-
-    // fallback: hanya jalan di browser
-    try {
-      if (typeof window === 'undefined' || typeof document === 'undefined') return false;
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      ta.style.top = '0';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      return true;
-    } catch {
-      return false;
     }
   }
 
@@ -148,7 +161,8 @@ export default function Page() {
             <div>
               <div style={S.cardTitle}>Prompt</div>
               <div style={S.cardHint}>
-                Tulis ide singkat. Nanti sistem bikin output JSON (storyboard + finalPrompt).
+                Pilih preset karakter, lalu tulis ide singkat. Sistem akan buat
+                storyboard + finalPrompt.
               </div>
             </div>
 
@@ -165,6 +179,41 @@ export default function Page() {
             </button>
           </div>
 
+          {/* Toggle preset */}
+          <div style={S.toggleRow}>
+            <button
+              type="button"
+              onClick={() => setActivePreset('sweepy')}
+              disabled={loading}
+              style={{
+                ...S.toggleBtn,
+                ...(activePreset === 'sweepy'
+                  ? S.toggleBtnActive
+                  : S.toggleBtnIdle),
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              🐵 Sweepy
+              <span style={S.toggleSub}>@mockey.mo</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActivePreset('hanz26')}
+              disabled={loading}
+              style={{
+                ...S.toggleBtn,
+                ...(activePreset === 'hanz26'
+                  ? S.toggleBtnActive
+                  : S.toggleBtnIdle),
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              🧑 @hanz26
+              <span style={S.toggleSub}>AI version</span>
+            </button>
+          </div>
+
           <textarea
             style={S.textarea}
             value={prompt}
@@ -172,9 +221,22 @@ export default function Page() {
               setPrompt(e.target.value);
               if (err) setErr('');
             }}
-            placeholder={`Contoh:\n"${examplePrompt}"`}
+            placeholder={
+              activePreset === 'sweepy'
+                ? `Contoh:\n"${examplePromptSweepy}"`
+                : `Contoh:\n"${examplePromptHanz}"`
+            }
             rows={6}
           />
+
+          <div style={S.presetInfo}>
+            Preset aktif:{' '}
+            <b>
+              {activePreset === 'sweepy'
+                ? 'Sweepy (@mockey.mo)'
+                : '@hanz26 (AI version)'}
+            </b>
+          </div>
 
           <div style={S.actionsRow}>
             <button
@@ -194,6 +256,10 @@ export default function Page() {
               <div style={S.metaLine}>
                 Endpoint: <code style={S.code}>POST /api/generate</code>
               </div>
+              <div style={S.metaLine}>
+                Preset payload:{' '}
+                <code style={S.code}>preset="{activePreset}"</code>
+              </div>
               {err ? <div style={S.errorText}>{err}</div> : null}
             </div>
           </div>
@@ -205,7 +271,8 @@ export default function Page() {
             <div>
               <div style={S.cardTitle}>Final Prompt (Copy ke Sora)</div>
               <div style={S.cardHint}>
-                Ini teks prompt final yang tinggal kamu paste ke Sora. (Bukan JSON.)
+                Ini teks prompt final yang tinggal kamu paste ke Sora. (Bukan
+                JSON.)
               </div>
             </div>
 
@@ -242,7 +309,8 @@ export default function Page() {
             <div>
               <div style={S.cardTitle}>Response JSON</div>
               <div style={S.cardHint}>
-                Ini JSON lengkap (storyboard, style, dll). Kalau mau simpan, pakai tombol copy.
+                JSON lengkap (storyboard, style, dll). Kalau mau simpan, pakai
+                tombol copy.
               </div>
             </div>
 
@@ -278,7 +346,8 @@ export default function Page() {
           </div>
 
           <div style={S.footerNote}>
-            Tips: test endpoint di browser, buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup.
+            Tips: test endpoint di browser, buka{' '}
+            <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup.
             Generate beneran pakai POST dari tombol.
           </div>
         </section>
@@ -317,7 +386,13 @@ const styles: Record<string, any> = {
     boxShadow: '0 0 24px rgba(76,245,219,0.28)',
     flexShrink: 0,
   },
-  title: { margin: 0, fontSize: 34, letterSpacing: 1.2, lineHeight: 1.05, fontWeight: 800 },
+  title: {
+    margin: 0,
+    fontSize: 34,
+    letterSpacing: 1.2,
+    lineHeight: 1.05,
+    fontWeight: 800,
+  },
   subtitle: { margin: '6px 0 0', opacity: 0.72, fontSize: 14 },
   badgeRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 },
   badge: {
@@ -346,7 +421,45 @@ const styles: Record<string, any> = {
     marginBottom: 12,
   },
   cardTitle: { fontSize: 16, fontWeight: 700, marginBottom: 4 },
-  cardHint: { fontSize: 12, opacity: 0.72, lineHeight: 1.35, maxWidth: 520 },
+  cardHint: {
+    fontSize: 12,
+    opacity: 0.72,
+    lineHeight: 1.35,
+    maxWidth: 520,
+  },
+
+  toggleRow: {
+    display: 'flex',
+    gap: 8,
+    marginBottom: 10,
+  },
+  toggleBtn: {
+    flex: 1,
+    padding: '10px 12px',
+    borderRadius: 14,
+    border: '1px solid rgba(255,255,255,0.12)',
+    color: 'rgba(255,255,255,0.92)',
+    background: 'rgba(255,255,255,0.06)',
+    fontWeight: 800,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 2,
+  },
+  toggleBtnActive: {
+    background:
+      'linear-gradient(90deg, rgba(76,245,219,0.35), rgba(106,169,255,0.25))',
+    border: '1px solid rgba(76,245,219,0.25)',
+  },
+  toggleBtnIdle: {
+    background: 'rgba(255,255,255,0.06)',
+  },
+  toggleSub: {
+    fontSize: 12,
+    opacity: 0.75,
+    fontWeight: 700,
+  },
+
   textarea: {
     width: '100%',
     resize: 'vertical',
@@ -361,6 +474,12 @@ const styles: Record<string, any> = {
     lineHeight: 1.5,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
   },
+  presetInfo: {
+    marginTop: 8,
+    fontSize: 12,
+    opacity: 0.8,
+  },
+
   actionsRow: {
     display: 'flex',
     gap: 12,
@@ -373,7 +492,8 @@ const styles: Record<string, any> = {
     padding: '12px 14px',
     borderRadius: 14,
     border: '1px solid rgba(255,255,255,0.12)',
-    background: 'linear-gradient(90deg, rgba(76,245,219,0.35), rgba(106,169,255,0.25))',
+    background:
+      'linear-gradient(90deg, rgba(76,245,219,0.35), rgba(106,169,255,0.25))',
     color: 'rgba(255,255,255,0.92)',
     fontWeight: 800,
     letterSpacing: 0.2,
@@ -399,7 +519,13 @@ const styles: Record<string, any> = {
     background: 'rgba(255,255,255,0.07)',
     border: '1px solid rgba(255,255,255,0.10)',
   },
-  errorText: { marginTop: 8, fontSize: 12, color: 'rgba(255,120,120,0.95)', fontWeight: 700 },
+  errorText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: 'rgba(255,120,120,0.95)',
+    fontWeight: 700,
+  },
+
   resultBox: {
     background: 'rgba(0,0,0,0.35)',
     border: '1px solid rgba(255,255,255,0.10)',
