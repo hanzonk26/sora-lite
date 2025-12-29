@@ -13,7 +13,8 @@ export default function Page() {
   const [copiedJson, setCopiedJson] = useState(false);
   const [copiedFinal, setCopiedFinal] = useState(false);
 
-  const finalRef = useRef<HTMLDivElement | null>(null);
+  // section element -> HTMLElement (bukan HTMLDivElement)
+  const finalRef = useRef<HTMLElement | null>(null);
 
   const exampleByPreset: Record<PresetKey, string> = {
     sweepy:
@@ -39,7 +40,7 @@ export default function Page() {
   }, [result]);
 
   const finalPrompt = useMemo(() => {
-    // backend kamu: result.output.finalPrompt
+    // backend: result.output.finalPrompt
     return result?.output?.finalPrompt ? String(result.output.finalPrompt) : '';
   }, [result]);
 
@@ -60,7 +61,6 @@ export default function Page() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // kirim preset juga (kalau backend kamu sudah baca preset)
         body: JSON.stringify({ prompt: p, preset }),
       });
 
@@ -76,6 +76,7 @@ export default function Page() {
 
       setResult(data);
 
+      // auto scroll ke Final Prompt
       setTimeout(() => {
         finalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 150);
@@ -112,11 +113,12 @@ export default function Page() {
     }
   }
 
-  function onUseExampleAuto() {
+  async function onUseExampleAuto() {
+    if (loading) return;
     const ex = exampleByPreset[preset];
     setPrompt(ex);
     setErr('');
-    generateWithText(ex); // auto-generate
+    await generateWithText(ex); // auto-generate
   }
 
   function onClear() {
@@ -183,6 +185,7 @@ export default function Page() {
                     ...S.presetBtn,
                     ...(active ? S.presetBtnActive : null),
                     opacity: loading ? 0.75 : 1,
+                    cursor: loading ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <div style={S.presetTop}>
@@ -209,13 +212,25 @@ export default function Page() {
           <div style={S.miniRow}>
             <div style={S.miniLeft}>
               <div style={S.miniText}>
-                Preset aktif: <span style={S.miniStrong}>{presetLabel[preset].sub === '@mockey.mo' ? 'Sweepy (@mockey.mo)' : '@hanz26 (AI version)'}</span>
+                Preset aktif:{' '}
+                <span style={S.miniStrong}>
+                  {preset === 'sweepy' ? 'Sweepy (@mockey.mo)' : '@hanz26 (AI version)'}
+                </span>
               </div>
             </div>
 
             <div style={S.miniRight}>
               <span style={S.charCount}>{prompt.length} chars</span>
-              <button type="button" onClick={onClear} disabled={loading || prompt.length === 0} style={S.linkBtn}>
+              <button
+                type="button"
+                onClick={onClear}
+                disabled={loading || prompt.length === 0}
+                style={{
+                  ...S.linkBtn,
+                  opacity: loading || prompt.length === 0 ? 0.6 : 1,
+                  cursor: loading || prompt.length === 0 ? 'not-allowed' : 'pointer',
+                }}
+              >
                 Clear
               </button>
             </div>
@@ -240,7 +255,8 @@ export default function Page() {
                 Endpoint: <code style={S.code}>POST /api/generate</code>
               </div>
               <div style={S.metaLine}>
-                Preset payload: <code style={S.code}>preset="{preset === 'sweepy' ? 'sweepy' : 'hanz26'}"</code>
+                Preset payload:{' '}
+                <code style={S.code}>preset="{preset === 'sweepy' ? 'sweepy' : 'hanz26'}"</code>
               </div>
               {err ? <div style={S.errorText}>{err}</div> : null}
             </div>
@@ -485,7 +501,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     color: 'rgba(76,245,219,0.95)',
     fontWeight: 800,
-    cursor: 'pointer',
     padding: 6,
   },
   actionsRow: {
