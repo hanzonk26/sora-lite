@@ -1,26 +1,27 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 
 type PresetKey = 'sweepy' | 'hanz26';
 
 export default function Page() {
-  const [activePreset, setActivePreset] = useState<PresetKey>('sweepy');
-
+  const [preset, setPreset] = useState<PresetKey>('sweepy');
   const [prompt, setPrompt] = useState('');
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string>('');
-  const [copiedJson, setCopiedJson] = useState(false);
   const [copiedFinal, setCopiedFinal] = useState(false);
+  const [copiedJson, setCopiedJson] = useState(false);
+  const [showJson, setShowJson] = useState(false);
 
-  const examplePromptSweepy =
-    'Sweepy (@mockey.mo) nonton film horor, sosok di TV makin mendekat, Sweepy gebuk TV pakai remote, suasana lucu tapi tegang';
-  const examplePromptHanz =
-    '@hanz26 duduk santai seperti UGC, bercerita singkat dengan ekspresi natural, cinematic lighting, vibe relatable';
+  const finalRef = useRef<HTMLDivElement | null>(null);
 
-  const examplePrompt =
-    activePreset === 'sweepy' ? examplePromptSweepy : examplePromptHanz;
+  const exampleByPreset: Record<PresetKey, string> = {
+    sweepy:
+      'Sweepy sendirian di sungai mencari ikan kecil. Tiba-tiba buaya muncul mendekat. Sweepy refleks ambil kayu dan memukul buaya itu, lalu buaya kabur.',
+    hanz26:
+      '@hanz26 duduk santai seperti UGC, cerita singkat dengan ekspresi natural, vibe relatable, lighting bagus, soft selling halus.',
+  };
 
   const canSubmit = prompt.trim().length > 0 && !loading;
 
@@ -33,46 +34,13 @@ export default function Page() {
     }
   }, [result]);
 
-  // Ambil finalPrompt dari output (tahan banting jika key beda)
-  const finalPrompt = useMemo(() => {
-    const fp =
-      result?.output?.finalPrompt ??
-      result?.output?.finalprompt ??
-      result?.finalPrompt ??
-      result?.finalprompt ??
-      '';
-    return typeof fp === 'string' ? fp : '';
+  const finalPrompt: string = useMemo(() => {
+    return String(result?.output?.finalPrompt ?? '');
   }, [result]);
 
-  async function safeCopy(text: string) {
-    if (!text) return false;
-
-    // Clipboard modern
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        return true;
-      }
-    } catch {}
-
-    // Fallback (hanya di browser)
-    try {
-      if (typeof window === 'undefined' || typeof document === 'undefined')
-        return false;
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      ta.style.top = '0';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      return true;
-    } catch {
-      return false;
-    }
+  function toast(setter: (v: boolean) => void) {
+    setter(true);
+    setTimeout(() => setter(false), 1200);
   }
 
   async function onGenerate() {
@@ -84,16 +52,15 @@ export default function Page() {
 
     setErr('');
     setResult(null);
-    setCopiedJson(false);
-    setCopiedFinal(false);
     setLoading(true);
+    setCopiedFinal(false);
+    setCopiedJson(false);
 
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Kirim preset ke backend (kalau backend belum pakai, tidak apa-apa)
-        body: JSON.stringify({ prompt: p, preset: activePreset }),
+        body: JSON.stringify({ prompt: p, preset }),
       });
 
       const data = await res.json().catch(() => null);
@@ -107,6 +74,11 @@ export default function Page() {
       }
 
       setResult(data);
+
+      // UX: auto scroll ke Final Prompt biar user langsung "Copy ke Sora"
+      setTimeout(() => {
+        finalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
     } catch (e: any) {
       setErr(e?.message || 'Terjadi error.');
     } finally {
@@ -114,22 +86,45 @@ export default function Page() {
     }
   }
 
-  async function onCopyJson() {
-    if (!prettyResult) return;
-    const ok = await safeCopy(prettyResult);
-    if (ok) {
-      setCopiedJson(true);
-      setTimeout(() => setCopiedJson(false), 1200);
+  async function copyText(text: string, onOk: () => void) {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      onOk();
+    } catch {
+      // fallback
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        onOk();
+      } catch {
+        // no-op
+      }
     }
   }
 
-  async function onCopyFinalPrompt() {
-    if (!finalPrompt) return;
-    const ok = await safeCopy(finalPrompt);
-    if (ok) {
-      setCopiedFinal(true);
-      setTimeout(() => setCopiedFinal(false), 1200);
-    }
+  async function onCopyFinal() {
+    await copyText(finalPrompt, () => toast(setCopiedFinal));
+  }
+
+  async function onCopyJson() {
+    await copyText(prettyResult, () => toast(setCopiedJson));
+  }
+
+  function onUseExample() {
+    setPrompt(exampleByPreset[preset]);
+    setErr('');
+  }
+
+  function onClear() {
+    setPrompt('');
+    setErr('');
+    setResult(null);
+    setShowJson(false);
   }
 
   const S = styles;
@@ -139,6 +134,7 @@ export default function Page() {
       <div style={S.bgGlow} />
 
       <main style={S.container}>
+        {/* Header */}
         <header style={S.header}>
           <div style={S.brandRow}>
             <div style={S.logoDot} />
@@ -150,67 +146,63 @@ export default function Page() {
 
           <div style={S.badgeRow}>
             <span style={S.badge}>Mobile-first</span>
-            <span style={S.badge}>Next.js App Router</span>
-            <span style={S.badge}>Demo UI</span>
+            <span style={S.badge}>Preset Character</span>
+            <span style={S.badge}>Copy-to-Sora</span>
           </div>
         </header>
 
-        {/* Card: Prompt */}
+        {/* Prompt Card */}
         <section style={S.card}>
           <div style={S.cardHead}>
             <div>
               <div style={S.cardTitle}>Prompt</div>
               <div style={S.cardHint}>
-                Pilih preset karakter, lalu tulis ide singkat. Sistem akan buat
-                storyboard + finalPrompt.
+                Pilih preset karakter, lalu tulis ide singkat. Sistem akan buat storyboard + <b>finalPrompt</b> untuk kamu paste ke Sora.
               </div>
             </div>
 
             <button
               type="button"
               style={{ ...S.smallBtn, opacity: loading ? 0.6 : 1 }}
-              onClick={() => {
-                setPrompt(examplePrompt);
-                setErr('');
-              }}
+              onClick={onUseExample}
               disabled={loading}
             >
               Pakai contoh
             </button>
           </div>
 
-          {/* Toggle preset */}
-          <div style={S.toggleRow}>
+          {/* Preset Toggle */}
+          <div style={S.presetRow}>
             <button
               type="button"
-              onClick={() => setActivePreset('sweepy')}
-              disabled={loading}
+              onClick={() => setPreset('sweepy')}
               style={{
-                ...S.toggleBtn,
-                ...(activePreset === 'sweepy'
-                  ? S.toggleBtnActive
-                  : S.toggleBtnIdle),
-                opacity: loading ? 0.7 : 1,
+                ...S.presetBtn,
+                ...(preset === 'sweepy' ? S.presetBtnActive : null),
               }}
+              disabled={loading}
             >
-              🐵 Sweepy
-              <span style={S.toggleSub}>@mockey.mo</span>
+              <div style={S.presetTop}>
+                <span style={S.presetIcon}>🐵</span>
+                <span style={S.presetName}>Sweepy</span>
+              </div>
+              <div style={S.presetSub}>@mockey.mo</div>
             </button>
 
             <button
               type="button"
-              onClick={() => setActivePreset('hanz26')}
-              disabled={loading}
+              onClick={() => setPreset('hanz26')}
               style={{
-                ...S.toggleBtn,
-                ...(activePreset === 'hanz26'
-                  ? S.toggleBtnActive
-                  : S.toggleBtnIdle),
-                opacity: loading ? 0.7 : 1,
+                ...S.presetBtn,
+                ...(preset === 'hanz26' ? S.presetBtnActive : null),
               }}
+              disabled={loading}
             >
-              🧑 @hanz26
-              <span style={S.toggleSub}>AI version</span>
+              <div style={S.presetTop}>
+                <span style={S.presetIcon}>🧑</span>
+                <span style={S.presetName}>@hanz26</span>
+              </div>
+              <div style={S.presetSub}>AI version</div>
             </button>
           </div>
 
@@ -221,23 +213,27 @@ export default function Page() {
               setPrompt(e.target.value);
               if (err) setErr('');
             }}
-            placeholder={
-              activePreset === 'sweepy'
-                ? `Contoh:\n"${examplePromptSweepy}"`
-                : `Contoh:\n"${examplePromptHanz}"`
-            }
+            placeholder={`Contoh:\n"${exampleByPreset[preset]}"`}
             rows={6}
           />
 
-          <div style={S.presetInfo}>
-            Preset aktif:{' '}
-            <b>
-              {activePreset === 'sweepy'
-                ? 'Sweepy (@mockey.mo)'
-                : '@hanz26 (AI version)'}
-            </b>
+          {/* helper row */}
+          <div style={S.helperRow}>
+            <div style={S.helperLeft}>
+              <span style={S.helperLabel}>Preset aktif:</span>{' '}
+              <b style={{ opacity: 0.95 }}>
+                {preset === 'sweepy' ? 'Sweepy (@mockey.mo)' : '@hanz26 (AI version)'}
+              </b>
+            </div>
+            <div style={S.helperRight}>
+              <span style={S.counter}>{prompt.trim().length} chars</span>
+              <button type="button" onClick={onClear} style={S.linkBtn} disabled={loading && !prompt}>
+                Clear
+              </button>
+            </div>
           </div>
 
+          {/* Actions */}
           <div style={S.actionsRow}>
             <button
               type="button"
@@ -257,28 +253,24 @@ export default function Page() {
                 Endpoint: <code style={S.code}>POST /api/generate</code>
               </div>
               <div style={S.metaLine}>
-                Preset payload:{' '}
-                <code style={S.code}>preset="{activePreset}"</code>
+                Preset payload: <code style={S.code}>preset="{preset}"</code>
               </div>
               {err ? <div style={S.errorText}>{err}</div> : null}
             </div>
           </div>
         </section>
 
-        {/* Card: Final Prompt (yang dipakai ke Sora) */}
-        <section style={S.card}>
+        {/* Final Prompt Card */}
+        <section style={S.card} ref={finalRef}>
           <div style={S.cardHead}>
             <div>
               <div style={S.cardTitle}>Final Prompt (Copy ke Sora)</div>
-              <div style={S.cardHint}>
-                Ini teks prompt final yang tinggal kamu paste ke Sora. (Bukan
-                JSON.)
-              </div>
+              <div style={S.cardHint}>Ini teks prompt final yang tinggal kamu paste ke Sora. (Bukan JSON.)</div>
             </div>
 
             <button
               type="button"
-              onClick={onCopyFinalPrompt}
+              onClick={onCopyFinal}
               disabled={!finalPrompt}
               style={{
                 ...S.smallBtn,
@@ -291,72 +283,68 @@ export default function Page() {
           </div>
 
           <div style={S.resultBox}>
-            {!finalPrompt && !loading ? (
-              <div style={S.emptyState}>
-                Belum ada finalPrompt. Klik <b>Generate</b> dulu.
-              </div>
-            ) : null}
-
+            {!finalPrompt && !loading ? <div style={S.emptyState}>Belum ada hasil. Tekan Generate dulu.</div> : null}
             {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
-
-            {finalPrompt ? <pre style={S.pre}>{finalPrompt}</pre> : null}
+            {finalPrompt ? <pre style={{ ...S.pre, fontSize: 13 }}>{finalPrompt}</pre> : null}
           </div>
         </section>
 
-        {/* Card: Response JSON */}
+        {/* JSON Card (collapsible) */}
         <section style={S.card}>
           <div style={S.cardHead}>
             <div>
               <div style={S.cardTitle}>Response JSON</div>
-              <div style={S.cardHint}>
-                JSON lengkap (storyboard, style, dll). Kalau mau simpan, pakai
-                tombol copy.
-              </div>
+              <div style={S.cardHint}>Opsional. Kalau butuh detail storyboard, buka bagian ini.</div>
             </div>
 
-            <button
-              type="button"
-              onClick={onCopyJson}
-              disabled={!prettyResult}
-              style={{
-                ...S.smallBtn,
-                opacity: prettyResult ? 1 : 0.5,
-                cursor: prettyResult ? 'pointer' : 'not-allowed',
-              }}
-            >
-              {copiedJson ? 'Copied ✅' : 'Copy JSON'}
-            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setShowJson((v) => !v)}
+                style={S.smallBtn}
+                disabled={!result}
+              >
+                {showJson ? 'Hide JSON' : 'Show JSON'}
+              </button>
+              <button
+                type="button"
+                onClick={onCopyJson}
+                disabled={!prettyResult}
+                style={{
+                  ...S.smallBtn,
+                  opacity: prettyResult ? 1 : 0.5,
+                  cursor: prettyResult ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {copiedJson ? 'Copied ✅' : 'Copy JSON'}
+              </button>
+            </div>
           </div>
 
-          <div style={S.resultBox}>
-            {!result && !loading && !err ? (
-              <div style={S.emptyState}>Belum ada hasil.</div>
-            ) : null}
-
-            {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
-
-            {result ? <pre style={S.pre}>{prettyResult}</pre> : null}
-
-            {err ? (
-              <div style={S.errorBox}>
-                <div style={S.errorTitle}>Error</div>
-                <div style={S.errorMsg}>{err}</div>
-              </div>
-            ) : null}
-          </div>
+          {showJson ? (
+            <div style={S.resultBox}>
+              {!result && !loading && !err ? <div style={S.emptyState}>Belum ada hasil.</div> : null}
+              {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
+              {result ? <pre style={S.pre}>{prettyResult}</pre> : null}
+            </div>
+          ) : (
+            <div style={S.collapsedHint}>
+              {result ? 'JSON tersedia. Tap “Show JSON” bila perlu.' : 'Belum ada JSON.'}
+            </div>
+          )}
 
           <div style={S.footerNote}>
-            Tips: test endpoint di browser, buka{' '}
-            <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup.
-            Generate beneran pakai POST dari tombol.
+            Tips: test endpoint di browser, buka <code style={S.code}>/api/generate</code> (GET) hanya cek hidup. Generate beneran via POST tombol.
           </div>
         </section>
+
+        <div style={S.bottomSpace} />
       </main>
     </div>
   );
 }
 
-const styles: Record<string, any> = {
+const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: '100vh',
     background: 'linear-gradient(180deg, #0b1b1e 0%, #070a0f 60%, #05060a 100%)',
@@ -376,6 +364,7 @@ const styles: Record<string, any> = {
     pointerEvents: 'none',
   },
   container: { maxWidth: 860, margin: '0 auto', position: 'relative' },
+
   header: { marginBottom: 14 },
   brandRow: { display: 'flex', gap: 12, alignItems: 'center' },
   logoDot: {
@@ -386,14 +375,9 @@ const styles: Record<string, any> = {
     boxShadow: '0 0 24px rgba(76,245,219,0.28)',
     flexShrink: 0,
   },
-  title: {
-    margin: 0,
-    fontSize: 34,
-    letterSpacing: 1.2,
-    lineHeight: 1.05,
-    fontWeight: 800,
-  },
+  title: { margin: 0, fontSize: 34, letterSpacing: 1.2, lineHeight: 1.05, fontWeight: 800 },
   subtitle: { margin: '6px 0 0', opacity: 0.72, fontSize: 14 },
+
   badgeRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 },
   badge: {
     fontSize: 12,
@@ -403,6 +387,7 @@ const styles: Record<string, any> = {
     border: '1px solid rgba(255,255,255,0.10)',
     opacity: 0.9,
   },
+
   card: {
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.10)',
@@ -420,45 +405,32 @@ const styles: Record<string, any> = {
     alignItems: 'flex-start',
     marginBottom: 12,
   },
-  cardTitle: { fontSize: 16, fontWeight: 700, marginBottom: 4 },
-  cardHint: {
-    fontSize: 12,
-    opacity: 0.72,
-    lineHeight: 1.35,
-    maxWidth: 520,
-  },
+  cardTitle: { fontSize: 16, fontWeight: 800, marginBottom: 4 },
+  cardHint: { fontSize: 12, opacity: 0.72, lineHeight: 1.35, maxWidth: 560 },
 
-  toggleRow: {
-    display: 'flex',
-    gap: 8,
-    marginBottom: 10,
+  presetRow: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 10,
+    marginBottom: 12,
   },
-  toggleBtn: {
-    flex: 1,
-    padding: '10px 12px',
-    borderRadius: 14,
-    border: '1px solid rgba(255,255,255,0.12)',
-    color: 'rgba(255,255,255,0.92)',
-    background: 'rgba(255,255,255,0.06)',
-    fontWeight: 800,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 2,
+  presetBtn: {
+    textAlign: 'left',
+    padding: '12px 12px',
+    borderRadius: 16,
+    border: '1px solid rgba(255,255,255,0.10)',
+    background: 'rgba(255,255,255,0.04)',
+    color: 'rgba(255,255,255,0.90)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
   },
-  toggleBtnActive: {
-    background:
-      'linear-gradient(90deg, rgba(76,245,219,0.35), rgba(106,169,255,0.25))',
-    border: '1px solid rgba(76,245,219,0.25)',
+  presetBtnActive: {
+    border: '1px solid rgba(76,245,219,0.35)',
+    background: 'linear-gradient(90deg, rgba(76,245,219,0.15), rgba(106,169,255,0.10))',
   },
-  toggleBtnIdle: {
-    background: 'rgba(255,255,255,0.06)',
-  },
-  toggleSub: {
-    fontSize: 12,
-    opacity: 0.75,
-    fontWeight: 700,
-  },
+  presetTop: { display: 'flex', alignItems: 'center', gap: 10 },
+  presetIcon: { fontSize: 16 },
+  presetName: { fontWeight: 900, fontSize: 14 },
+  presetSub: { marginTop: 4, fontSize: 12, opacity: 0.75 },
 
   textarea: {
     width: '100%',
@@ -474,10 +446,26 @@ const styles: Record<string, any> = {
     lineHeight: 1.5,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
   },
-  presetInfo: {
-    marginTop: 8,
+
+  helperRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
+    flexWrap: 'wrap',
+  },
+  helperLeft: { fontSize: 12, opacity: 0.85 },
+  helperLabel: { opacity: 0.75 },
+  helperRight: { display: 'flex', alignItems: 'center', gap: 10 },
+  counter: { fontSize: 12, opacity: 0.65 },
+  linkBtn: {
     fontSize: 12,
-    opacity: 0.8,
+    fontWeight: 800,
+    background: 'transparent',
+    border: 'none',
+    color: 'rgba(76,245,219,0.90)',
+    padding: 0,
   },
 
   actionsRow: {
@@ -492,10 +480,9 @@ const styles: Record<string, any> = {
     padding: '12px 14px',
     borderRadius: 14,
     border: '1px solid rgba(255,255,255,0.12)',
-    background:
-      'linear-gradient(90deg, rgba(76,245,219,0.35), rgba(106,169,255,0.25))',
+    background: 'linear-gradient(90deg, rgba(76,245,219,0.35), rgba(106,169,255,0.25))',
     color: 'rgba(255,255,255,0.92)',
-    fontWeight: 800,
+    fontWeight: 900,
     letterSpacing: 0.2,
     width: '100%',
     maxWidth: 360,
@@ -507,10 +494,10 @@ const styles: Record<string, any> = {
     border: '1px solid rgba(255,255,255,0.12)',
     background: 'rgba(255,255,255,0.06)',
     color: 'rgba(255,255,255,0.9)',
-    fontWeight: 700,
+    fontWeight: 800,
     fontSize: 13,
   },
-  metaRight: { flex: 1, minWidth: 200 },
+  metaRight: { flex: 1, minWidth: 220 },
   metaLine: { fontSize: 12, opacity: 0.75, marginTop: 2 },
   code: {
     fontSize: 12,
@@ -519,12 +506,7 @@ const styles: Record<string, any> = {
     background: 'rgba(255,255,255,0.07)',
     border: '1px solid rgba(255,255,255,0.10)',
   },
-  errorText: {
-    marginTop: 8,
-    fontSize: 12,
-    color: 'rgba(255,120,120,0.95)',
-    fontWeight: 700,
-  },
+  errorText: { marginTop: 8, fontSize: 12, color: 'rgba(255,120,120,0.95)', fontWeight: 800 },
 
   resultBox: {
     background: 'rgba(0,0,0,0.35)',
@@ -539,19 +521,19 @@ const styles: Record<string, any> = {
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
     fontSize: 12,
-    lineHeight: 1.5,
+    lineHeight: 1.55,
     color: 'rgba(255,255,255,0.92)',
   },
   emptyState: { fontSize: 13, opacity: 0.65 },
   loadingState: { fontSize: 13, opacity: 0.85 },
-  errorBox: {
-    marginTop: 10,
-    padding: 10,
-    borderRadius: 12,
-    border: '1px solid rgba(255,120,120,0.35)',
-    background: 'rgba(255,120,120,0.08)',
+
+  collapsedHint: {
+    fontSize: 12,
+    opacity: 0.7,
+    padding: '8px 2px 2px',
   },
-  errorTitle: { fontWeight: 800, fontSize: 13, marginBottom: 4 },
-  errorMsg: { fontSize: 12, opacity: 0.9 },
+
   footerNote: { marginTop: 10, fontSize: 12, opacity: 0.7, lineHeight: 1.4 },
+
+  bottomSpace: { height: 10 },
 };
