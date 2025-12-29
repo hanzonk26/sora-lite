@@ -13,14 +13,13 @@ export default function Page() {
   const [copiedJson, setCopiedJson] = useState(false);
   const [copiedFinal, setCopiedFinal] = useState(false);
 
-  // section element -> HTMLElement (bukan HTMLDivElement)
-  const finalRef = useRef<HTMLElement | null>(null);
+  const finalRef = useRef<HTMLDivElement | null>(null);
 
   const exampleByPreset: Record<PresetKey, string> = {
     sweepy:
-      '@mockey.mo (Sweepy) nonton film horor, sosok di TV makin mendekat, Sweepy gebuk TV pakai remote, suasana lucu tapi tegang',
+      '@mockey.mo (Sweepy) sendirian di sungai cari ikan kecil, tiba-tiba buaya muncul mendekat, Sweepy refleks ambil kayu dan pukul buaya itu. Cinematic lucu tapi tegang.',
     hanz26:
-      '@hanz26 duduk santai seperti UGC, cerita singkat dengan ekspresi natural, vibe relatable, lighting bagus, soft selling halus',
+      '@hanz26 duduk santai gaya UGC, cerita singkat dengan ekspresi natural, vibe relatable, lighting bagus, soft selling halus (tanpa hard selling).',
   };
 
   const presetLabel: Record<PresetKey, { title: string; sub: string; emoji: string }> = {
@@ -40,7 +39,6 @@ export default function Page() {
   }, [result]);
 
   const finalPrompt = useMemo(() => {
-    // backend: result.output.finalPrompt
     return result?.output?.finalPrompt ? String(result.output.finalPrompt) : '';
   }, [result]);
 
@@ -76,7 +74,6 @@ export default function Page() {
 
       setResult(data);
 
-      // auto scroll ke Final Prompt
       setTimeout(() => {
         finalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 150);
@@ -113,12 +110,11 @@ export default function Page() {
     }
   }
 
-  async function onUseExampleAuto() {
-    if (loading) return;
+  function onUseExampleAuto() {
     const ex = exampleByPreset[preset];
     setPrompt(ex);
     setErr('');
-    await generateWithText(ex); // auto-generate
+    generateWithText(ex);
   }
 
   function onClear() {
@@ -183,9 +179,8 @@ export default function Page() {
                   disabled={loading}
                   style={{
                     ...S.presetBtn,
-                    ...(active ? S.presetBtnActive : null),
+                    ...(active ? S.presetBtnActive : undefined),
                     opacity: loading ? 0.75 : 1,
-                    cursor: loading ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <div style={S.presetTop}>
@@ -227,7 +222,7 @@ export default function Page() {
                 disabled={loading || prompt.length === 0}
                 style={{
                   ...S.linkBtn,
-                  opacity: loading || prompt.length === 0 ? 0.6 : 1,
+                  opacity: loading || prompt.length === 0 ? 0.5 : 1,
                   cursor: loading || prompt.length === 0 ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -255,8 +250,7 @@ export default function Page() {
                 Endpoint: <code style={S.code}>POST /api/generate</code>
               </div>
               <div style={S.metaLine}>
-                Preset payload:{' '}
-                <code style={S.code}>preset="{preset === 'sweepy' ? 'sweepy' : 'hanz26'}"</code>
+                Preset payload: <code style={S.code}>preset="{preset}"</code>
               </div>
               {err ? <div style={S.errorText}>{err}</div> : null}
             </div>
@@ -327,8 +321,7 @@ export default function Page() {
           </div>
 
           <div style={S.footerNote}>
-            Tips: untuk test endpoint di browser, buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup.
-            Generate beneran pakai POST dari tombol.
+            Tips: untuk test endpoint di browser, buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup. Generate beneran pakai POST dari tombol.
           </div>
         </section>
 
@@ -501,6 +494,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     color: 'rgba(76,245,219,0.95)',
     fontWeight: 800,
+    cursor: 'pointer',
     padding: 6,
   },
   actionsRow: {
