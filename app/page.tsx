@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-type StoryScene = {
+type Scene = {
   scene: number;
   durationSec?: number;
   action?: string;
@@ -12,199 +12,247 @@ type StoryScene = {
   notes?: string;
 };
 
-type GenerateOutput = {
-  title?: string;
-  hook?: string;
-  styleKey?: string;
-  style?: string;
-  storyboard?: StoryScene[];
-  finalPrompt?: string;
+type ApiResponse = {
+  ok: boolean;
+  input?: { prompt?: string };
+  output?: {
+    title?: string;
+    hook?: string;
+    styleKey?: string;
+    style?: string;
+    storyboard?: Scene[];
+    finalPrompt?: string;
+  };
+  message?: string;
+  error?: string;
 };
 
 export default function Page() {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [data, setData] = useState<GenerateOutput | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [res, setRes] = useState<ApiResponse | null>(null);
+  const [showRaw, setShowRaw] = useState(false);
 
   const canSubmit = useMemo(() => prompt.trim().length > 0 && !loading, [prompt, loading]);
 
   async function onGenerate() {
-    setErr(null);
-    setCopied(false);
+    if (!prompt.trim()) {
+      setRes({ ok: false, error: "Prompt tidak boleh kosong." });
+      return;
+    }
+
     setLoading(true);
-    setData(null);
+    setRes(null);
 
     try {
-      const res = await fetch("/api/generate", {
+      const r = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: prompt.trim() }),
       });
 
-      const json = await res.json().catch(() => null);
+      const data = (await r.json()) as ApiResponse;
 
-      if (!res.ok) {
-        throw new Error(json?.error || `Request failed (${res.status})`);
-      }
-
-      if (!json?.ok) {
-        throw new Error(json?.error || "Unknown error");
-      }
-
-      setData(json.output || null);
+      // Kalau server balikin error tapi HTTP 200, tetap tampilkan
+      setRes(data);
     } catch (e: any) {
-      setErr(e?.message || "Terjadi error.");
+      setRes({ ok: false, error: e?.message || "Gagal memanggil API." });
     } finally {
       setLoading(false);
     }
   }
 
-  async function copyFinal() {
-    if (!data?.finalPrompt) return;
+  async function copy(text?: string) {
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(data.finalPrompt);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
+      await navigator.clipboard.writeText(text);
+      alert("Copied!");
     } catch {
-      setErr("Gagal copy. Coba manual select & copy.");
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+      alert("Copied!");
     }
   }
 
-  return (
-    <main className="min-h-dvh bg-neutral-950 text-neutral-100">
-      <div className="mx-auto w-full max-w-[760px] px-4 pb-14 pt-10">
-        {/* Header */}
-        <header className="mb-6">
-          <h1 className="text-3xl font-semibold tracking-tight">Sora Lite</h1>
-          <p className="mt-1 text-sm text-neutral-400">
-            Personal AI Video Practice — buat storyboard & prompt final siap tempel.
-          </p>
-        </header>
+  const out = res?.output;
 
-        {/* Card: Input */}
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 shadow-sm">
-          <label className="mb-2 block text-sm font-medium text-neutral-200">Prompt</label>
+  return (
+    <main className="min-h-screen px-4 py-8 bg-black text-white">
+      <div className="mx-auto w-full max-w-xl">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <h1 className="text-4xl font-extrabold tracking-wide">SORA LITE</h1>
+          <p className="text-white/70 mt-2">Personal AI Video Practice</p>
+        </div>
+
+        {/* Prompt Card */}
+        <section className="bg-white/5 border border-white/10 rounded-2xl p-4 shadow-lg">
+          <label className="text-sm text-white/70">Prompt</label>
           <textarea
+            className="mt-2 w-full min-h-[120px] rounded-xl bg-black/40 border border-white/10 p-3 outline-none focus:border-white/30 text-white placeholder:text-white/30"
+            placeholder='Contoh: "Sweepy nonton film horror, sosok di TV makin dekat, Sweepy gebuk TV pakai remote, lucu tapi tegang"'
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder='Contoh: "Sweepy nonton film horor, sosok di TV mendekat, Sweepy gebuk TV pakai remote, sosok mundur ketakutan"'
-            className="min-h-[120px] w-full resize-none rounded-xl border border-neutral-800 bg-neutral-950/60 p-3 text-sm leading-6 text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-neutral-600 focus:ring-2 focus:ring-neutral-700"
           />
 
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-neutral-500">
-              Tips: isi **teks biasa** (jangan JSON).
-            </p>
+          <button
+            onClick={onGenerate}
+            disabled={!canSubmit}
+            className="mt-4 w-full rounded-xl py-3 font-semibold bg-gradient-to-r from-sky-500 to-emerald-400 text-black disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Generating..." : "Generate Video (Demo)"}
+          </button>
 
-            <button
-              onClick={onGenerate}
-              disabled={!canSubmit}
-              className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-sky-500 to-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading ? "Generating..." : "Generate (Demo)"}
-            </button>
-          </div>
-
-          {/* Error */}
-          {err && (
-            <div className="mt-3 rounded-xl border border-red-900/40 bg-red-950/40 p-3 text-sm text-red-200">
-              {err}
-            </div>
+          {!prompt.trim() && res?.error && (
+            <p className="mt-3 text-sm text-red-400">{res.error}</p>
           )}
         </section>
 
-        {/* Output */}
-        <section className="mt-6 space-y-4">
-          {!data && !loading && (
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-900/30 p-4 text-sm text-neutral-400">
-              Belum ada hasil. Masukkan prompt lalu generate.
+        {/* Result */}
+        <section className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">Result</h2>
+            {res && (
+              <button
+                className="text-sm text-white/70 underline"
+                onClick={() => setShowRaw((v) => !v)}
+              >
+                {showRaw ? "Sembunyikan JSON" : "Lihat JSON"}
+              </button>
+            )}
+          </div>
+
+          {!res && (
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-white/70">
+              Belum ada hasil.
             </div>
           )}
 
-          {data && (
-            <>
+          {res && !res.ok && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4">
+              <p className="font-semibold text-red-300">Error</p>
+              <p className="text-red-200/80 mt-1">{res.error || res.message || "Terjadi error."}</p>
+            </div>
+          )}
+
+          {res && res.ok && out && (
+            <div className="space-y-4">
               {/* Summary */}
-              <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold">{data.title || "Untitled"}</h2>
-                    {data.hook && <p className="mt-1 text-sm text-neutral-300">{data.hook}</p>}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                <p className="text-white/60 text-xs mb-1">Title</p>
+                <p className="text-xl font-bold">{out.title || "-"}</p>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {data.styleKey && (
-                        <span className="rounded-full border border-neutral-700 bg-neutral-950/40 px-3 py-1 text-xs text-neutral-300">
-                          StyleKey: {data.styleKey}
-                        </span>
-                      )}
-                      {data.style && (
-                        <span className="rounded-full border border-neutral-700 bg-neutral-950/40 px-3 py-1 text-xs text-neutral-300">
-                          {data.style}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                {out.hook && (
+                  <>
+                    <p className="text-white/60 text-xs mt-4 mb-1">Hook</p>
+                    <p className="text-white/90">{out.hook}</p>
+                  </>
+                )}
 
-                  <button
-                    onClick={copyFinal}
-                    disabled={!data.finalPrompt}
-                    className="inline-flex items-center justify-center rounded-xl border border-neutral-700 bg-neutral-950/40 px-3 py-2 text-sm text-neutral-100 transition hover:bg-neutral-950/70 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {copied ? "Copied ✅" : "Copy Final Prompt"}
-                  </button>
-                </div>
-
-                {data.finalPrompt && (
-                  <pre className="mt-4 whitespace-pre-wrap rounded-xl border border-neutral-800 bg-neutral-950/60 p-3 text-xs leading-6 text-neutral-200">
-                    {data.finalPrompt}
-                  </pre>
+                {out.style && (
+                  <>
+                    <p className="text-white/60 text-xs mt-4 mb-1">Style</p>
+                    <p className="text-white/90">{out.style}</p>
+                  </>
                 )}
               </div>
 
               {/* Storyboard */}
-              {Array.isArray(data.storyboard) && data.storyboard.length > 0 && (
-                <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4">
-                  <h3 className="text-sm font-semibold text-neutral-200">Storyboard</h3>
+              {Array.isArray(out.storyboard) && out.storyboard.length > 0 && (
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                  <p className="font-semibold mb-3">Storyboard</p>
 
-                  <div className="mt-3 grid gap-3">
-                    {data.storyboard.map((s, idx) => (
+                  <div className="space-y-3">
+                    {out.storyboard.map((s, idx) => (
                       <div
-                        key={`${s.scene}-${idx}`}
-                        className="rounded-2xl border border-neutral-800 bg-neutral-950/50 p-4"
+                        key={idx}
+                        className="rounded-xl border border-white/10 bg-black/30 p-3"
                       >
-                        <div className="mb-2 flex items-center justify-between">
-                          <p className="text-sm font-semibold">Scene {s.scene ?? idx + 1}</p>
-                          {typeof s.durationSec === "number" && (
-                            <span className="text-xs text-neutral-400">{s.durationSec}s</span>
-                          )}
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold">
+                            Scene {s.scene ?? idx + 1}
+                          </p>
+                          {s.durationSec ? (
+                            <span className="text-xs text-white/60">
+                              {s.durationSec}s
+                            </span>
+                          ) : null}
                         </div>
 
-                        <div className="space-y-2 text-sm">
-                          {s.action && <Row k="Action" v={s.action} />}
-                          {s.camera && <Row k="Camera" v={s.camera} />}
-                          {s.lighting && <Row k="Lighting" v={s.lighting} />}
-                          {s.sound && <Row k="Sound" v={s.sound} />}
-                          {s.notes && <Row k="Notes" v={s.notes} />}
-                        </div>
+                        {s.action && (
+                          <p className="text-sm text-white/90 mt-2">
+                            <span className="text-white/60">Action: </span>
+                            {s.action}
+                          </p>
+                        )}
+                        {s.camera && (
+                          <p className="text-sm text-white/90 mt-1">
+                            <span className="text-white/60">Camera: </span>
+                            {s.camera}
+                          </p>
+                        )}
+                        {s.lighting && (
+                          <p className="text-sm text-white/90 mt-1">
+                            <span className="text-white/60">Lighting: </span>
+                            {s.lighting}
+                          </p>
+                        )}
+                        {s.sound && (
+                          <p className="text-sm text-white/90 mt-1">
+                            <span className="text-white/60">Sound: </span>
+                            {s.sound}
+                          </p>
+                        )}
+                        {s.notes && (
+                          <p className="text-sm text-white/90 mt-1">
+                            <span className="text-white/60">Notes: </span>
+                            {s.notes}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-            </>
+
+              {/* Final Prompt */}
+              {out.finalPrompt && (
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold">Final Prompt</p>
+                    <button
+                      onClick={() => copy(out.finalPrompt)}
+                      className="text-sm px-3 py-1 rounded-lg bg-white/10 border border-white/10 hover:bg-white/20"
+                    >
+                      Copy
+                    </button>
+                  </div>
+
+                  <pre className="mt-3 whitespace-pre-wrap break-words text-sm text-white/90 bg-black/30 border border-white/10 rounded-xl p-3">
+                    {out.finalPrompt}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Raw JSON */}
+          {res && showRaw && (
+            <pre className="mt-4 whitespace-pre-wrap break-words text-xs text-white/80 bg-black/40 border border-white/10 rounded-2xl p-4">
+              {JSON.stringify(res, null, 2)}
+            </pre>
           )}
         </section>
+
+        <footer className="mt-8 text-center text-xs text-white/40">
+          Demo UI • Next.js App Router • /api/generate
+        </footer>
       </div>
     </main>
-  );
-}
-
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex gap-2">
-      <span className="w-[72px] shrink-0 text-xs font-medium text-neutral-400">{k}</span>
-      <span className="text-sm text-neutral-200">{v}</span>
-    </div>
   );
 }
