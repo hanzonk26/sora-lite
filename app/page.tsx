@@ -7,8 +7,8 @@ export default function Page() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string>('');
-  const [copied, setCopied] = useState(false);
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [copiedJson, setCopiedJson] = useState(false);
+  const [copiedFinal, setCopiedFinal] = useState(false);
 
   const examplePrompt =
     'Sweepy nonton film horor, sosok di TV makin mendekat, Sweepy gebuk TV pakai remote, suasana lucu tapi tegang';
@@ -24,8 +24,14 @@ export default function Page() {
     }
   }, [result]);
 
+  // Ambil finalPrompt dari output (tahan banting jika key beda)
   const finalPrompt = useMemo(() => {
-    const fp = result?.output?.finalPrompt;
+    const fp =
+      result?.output?.finalPrompt ??
+      result?.output?.finalprompt ??
+      result?.finalPrompt ??
+      result?.finalprompt ??
+      '';
     return typeof fp === 'string' ? fp : '';
   }, [result]);
 
@@ -38,8 +44,6 @@ export default function Page() {
 
     setErr('');
     setResult(null);
-    setCopied(false);
-    setCopiedPrompt(false);
     setLoading(true);
 
     try {
@@ -67,37 +71,51 @@ export default function Page() {
     }
   }
 
-  async function onCopy() {
-    if (!prettyResult) return;
+  async function safeCopy(text: string) {
+    if (!text) return false;
+
+    // clipboard modern
     try {
-      await navigator.clipboard.writeText(prettyResult);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {}
+
+    // fallback: hanya jalan di browser
+    try {
+      if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      ta.style.top = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      return true;
     } catch {
-      // fallback: no-op
+      return false;
     }
   }
 
-  async function onCopyPrompt() {
+  async function onCopyJson() {
+    if (!prettyResult) return;
+    const ok = await safeCopy(prettyResult);
+    if (ok) {
+      setCopiedJson(true);
+      setTimeout(() => setCopiedJson(false), 1200);
+    }
+  }
+
+  async function onCopyFinalPrompt() {
     if (!finalPrompt) return;
-    try {
-      await navigator.clipboard.writeText(finalPrompt);
-      setCopiedPrompt(true);
-      setTimeout(() => setCopiedPrompt(false), 1200);
-    } catch {
-      // fallback sederhana
-      try {
-        const ta = document.createElement('textarea');
-        ta.value = finalPrompt;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        setCopiedPrompt(true);
-        setTimeout(() => setCopiedPrompt(false), 1200);
-      } catch {
-        // no-op
-      }
+    const ok = await safeCopy(finalPrompt);
+    if (ok) {
+      setCopiedFinal(true);
+      setTimeout(() => setCopiedFinal(false), 1200);
     }
   }
 
@@ -116,6 +134,7 @@ export default function Page() {
               <p style={S.subtitle}>Personal AI Video Practice</p>
             </div>
           </div>
+
           <div style={S.badgeRow}>
             <span style={S.badge}>Mobile-first</span>
             <span style={S.badge}>Next.js App Router</span>
@@ -129,7 +148,7 @@ export default function Page() {
             <div>
               <div style={S.cardTitle}>Prompt</div>
               <div style={S.cardHint}>
-                Tulis ide singkat. Nanti sistem bikin output JSON storyboard/prompt.
+                Tulis ide singkat. Nanti sistem bikin output JSON (storyboard + finalPrompt).
               </div>
             </div>
 
@@ -180,19 +199,56 @@ export default function Page() {
           </div>
         </section>
 
-        {/* Card: Response */}
+        {/* Card: Final Prompt (yang dipakai ke Sora) */}
         <section style={S.card}>
           <div style={S.cardHead}>
             <div>
-              <div style={S.cardTitle}>Response</div>
+              <div style={S.cardTitle}>Final Prompt (Copy ke Sora)</div>
               <div style={S.cardHint}>
-                Hasil utama untuk Sora ada di <b>Final Prompt</b>. JSON tetap tampil untuk debug.
+                Ini teks prompt final yang tinggal kamu paste ke Sora. (Bukan JSON.)
               </div>
             </div>
 
             <button
               type="button"
-              onClick={onCopy}
+              onClick={onCopyFinalPrompt}
+              disabled={!finalPrompt}
+              style={{
+                ...S.smallBtn,
+                opacity: finalPrompt ? 1 : 0.5,
+                cursor: finalPrompt ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {copiedFinal ? 'Copied ✅' : 'Copy Final Prompt'}
+            </button>
+          </div>
+
+          <div style={S.resultBox}>
+            {!finalPrompt && !loading ? (
+              <div style={S.emptyState}>
+                Belum ada finalPrompt. Klik <b>Generate</b> dulu.
+              </div>
+            ) : null}
+
+            {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
+
+            {finalPrompt ? <pre style={S.pre}>{finalPrompt}</pre> : null}
+          </div>
+        </section>
+
+        {/* Card: Response JSON */}
+        <section style={S.card}>
+          <div style={S.cardHead}>
+            <div>
+              <div style={S.cardTitle}>Response JSON</div>
+              <div style={S.cardHint}>
+                Ini JSON lengkap (storyboard, style, dll). Kalau mau simpan, pakai tombol copy.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onCopyJson}
               disabled={!prettyResult}
               style={{
                 ...S.smallBtn,
@@ -200,7 +256,7 @@ export default function Page() {
                 cursor: prettyResult ? 'pointer' : 'not-allowed',
               }}
             >
-              {copied ? 'Copied ✅' : 'Copy JSON'}
+              {copiedJson ? 'Copied ✅' : 'Copy JSON'}
             </button>
           </div>
 
@@ -211,35 +267,6 @@ export default function Page() {
 
             {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
 
-            {/* Final Prompt box (yang dipakai di Sora) */}
-            {result && finalPrompt ? (
-              <div style={S.finalPromptBox}>
-                <div style={S.finalPromptHeader}>
-                  <div>
-                    <div style={S.finalPromptTitle}>Final Prompt (untuk Sora)</div>
-                    <div style={S.finalPromptHint}>Klik tombol untuk auto-copy, lalu paste ke prompt box Sora.</div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={onCopyPrompt}
-                    disabled={!finalPrompt}
-                    style={{
-                      ...S.smallBtn,
-                      opacity: finalPrompt ? 1 : 0.5,
-                      cursor: finalPrompt ? 'pointer' : 'not-allowed',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {copiedPrompt ? 'Copied ✅' : 'Copy Prompt'}
-                  </button>
-                </div>
-
-                <pre style={S.pre}>{finalPrompt}</pre>
-              </div>
-            ) : null}
-
-            {/* Raw JSON */}
             {result ? <pre style={S.pre}>{prettyResult}</pre> : null}
 
             {err ? (
@@ -251,7 +278,7 @@ export default function Page() {
           </div>
 
           <div style={S.footerNote}>
-            Tips: untuk test endpoint di browser, buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup.
+            Tips: test endpoint di browser, buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup.
             Generate beneran pakai POST dari tombol.
           </div>
         </section>
@@ -260,7 +287,7 @@ export default function Page() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, any> = {
   page: {
     minHeight: '100vh',
     background: 'linear-gradient(180deg, #0b1b1e 0%, #070a0f 60%, #05060a 100%)',
@@ -279,19 +306,9 @@ const styles: Record<string, React.CSSProperties> = {
     filter: 'blur(6px)',
     pointerEvents: 'none',
   },
-  container: {
-    maxWidth: 860,
-    margin: '0 auto',
-    position: 'relative',
-  },
-  header: {
-    marginBottom: 14,
-  },
-  brandRow: {
-    display: 'flex',
-    gap: 12,
-    alignItems: 'center',
-  },
+  container: { maxWidth: 860, margin: '0 auto', position: 'relative' },
+  header: { marginBottom: 14 },
+  brandRow: { display: 'flex', gap: 12, alignItems: 'center' },
   logoDot: {
     width: 14,
     height: 14,
@@ -300,24 +317,9 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 0 24px rgba(76,245,219,0.28)',
     flexShrink: 0,
   },
-  title: {
-    margin: 0,
-    fontSize: 34,
-    letterSpacing: 1.2,
-    lineHeight: 1.05,
-    fontWeight: 800,
-  },
-  subtitle: {
-    margin: '6px 0 0',
-    opacity: 0.72,
-    fontSize: 14,
-  },
-  badgeRow: {
-    display: 'flex',
-    gap: 8,
-    flexWrap: 'wrap',
-    marginTop: 10,
-  },
+  title: { margin: 0, fontSize: 34, letterSpacing: 1.2, lineHeight: 1.05, fontWeight: 800 },
+  subtitle: { margin: '6px 0 0', opacity: 0.72, fontSize: 14 },
+  badgeRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 },
   badge: {
     fontSize: 12,
     padding: '6px 10px',
@@ -343,17 +345,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'flex-start',
     marginBottom: 12,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 700,
-    marginBottom: 4,
-  },
-  cardHint: {
-    fontSize: 12,
-    opacity: 0.72,
-    lineHeight: 1.35,
-    maxWidth: 520,
-  },
+  cardTitle: { fontSize: 16, fontWeight: 700, marginBottom: 4 },
+  cardHint: { fontSize: 12, opacity: 0.72, lineHeight: 1.35, maxWidth: 520 },
   textarea: {
     width: '100%',
     resize: 'vertical',
@@ -397,15 +390,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     fontSize: 13,
   },
-  metaRight: {
-    flex: 1,
-    minWidth: 200,
-  },
-  metaLine: {
-    fontSize: 12,
-    opacity: 0.75,
-    marginTop: 2,
-  },
+  metaRight: { flex: 1, minWidth: 200 },
+  metaLine: { fontSize: 12, opacity: 0.75, marginTop: 2 },
   code: {
     fontSize: 12,
     padding: '2px 6px',
@@ -413,12 +399,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(255,255,255,0.07)',
     border: '1px solid rgba(255,255,255,0.10)',
   },
-  errorText: {
-    marginTop: 8,
-    fontSize: 12,
-    color: 'rgba(255,120,120,0.95)',
-    fontWeight: 700,
-  },
+  errorText: { marginTop: 8, fontSize: 12, color: 'rgba(255,120,120,0.95)', fontWeight: 700 },
   resultBox: {
     background: 'rgba(0,0,0,0.35)',
     border: '1px solid rgba(255,255,255,0.10)',
@@ -426,30 +407,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 12,
     minHeight: 120,
     overflow: 'hidden',
-  },
-  finalPromptBox: {
-    marginBottom: 12,
-    padding: 12,
-    borderRadius: 14,
-    background: 'rgba(0,0,0,0.22)',
-    border: '1px solid rgba(76,245,219,0.20)',
-  },
-  finalPromptHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 10,
-    flexWrap: 'wrap',
-  },
-  finalPromptTitle: {
-    fontSize: 13,
-    fontWeight: 800,
-    marginBottom: 3,
-  },
-  finalPromptHint: {
-    fontSize: 12,
-    opacity: 0.7,
   },
   pre: {
     margin: 0,
@@ -459,14 +416,8 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.5,
     color: 'rgba(255,255,255,0.92)',
   },
-  emptyState: {
-    fontSize: 13,
-    opacity: 0.65,
-  },
-  loadingState: {
-    fontSize: 13,
-    opacity: 0.85,
-  },
+  emptyState: { fontSize: 13, opacity: 0.65 },
+  loadingState: { fontSize: 13, opacity: 0.85 },
   errorBox: {
     marginTop: 10,
     padding: 10,
@@ -474,20 +425,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,120,120,0.35)',
     background: 'rgba(255,120,120,0.08)',
   },
-  errorTitle: {
-    fontWeight: 800,
-    fontSize: 13,
-    marginBottom: 4,
-  },
-  errorMsg: {
-    fontSize: 12,
-    opacity: 0.9,
-  },
-  footerNote: {
-    marginTop: 10,
-    fontSize: 12,
-    opacity: 0.7,
-    lineHeight: 1.4,
-  },
+  errorTitle: { fontWeight: 800, fontSize: 13, marginBottom: 4 },
+  errorMsg: { fontSize: 12, opacity: 0.9 },
+  footerNote: { marginTop: 10, fontSize: 12, opacity: 0.7, lineHeight: 1.4 },
 };
-```0
