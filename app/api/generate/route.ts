@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    message: "GET /api/generate is working. Use POST to generate.",
+  });
+}
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  const prompt = body?.prompt ?? "no prompt";
 
   return NextResponse.json({
     ok: true,
-    receivedPrompt: prompt,
-    message: "Generate endpoint working (demo).",
+    received: body,
+    message: "POST /api/generate is working (demo).",
   });
 }
