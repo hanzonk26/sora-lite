@@ -8,6 +8,7 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   const examplePrompt =
     'Sweepy nonton film horor, sosok di TV makin mendekat, Sweepy gebuk TV pakai remote, suasana lucu tapi tegang';
@@ -23,6 +24,11 @@ export default function Page() {
     }
   }, [result]);
 
+  const finalPrompt = useMemo(() => {
+    const fp = result?.output?.finalPrompt;
+    return typeof fp === 'string' ? fp : '';
+  }, [result]);
+
   async function onGenerate() {
     const p = prompt.trim();
     if (!p) {
@@ -32,6 +38,8 @@ export default function Page() {
 
     setErr('');
     setResult(null);
+    setCopied(false);
+    setCopiedPrompt(false);
     setLoading(true);
 
     try {
@@ -67,6 +75,29 @@ export default function Page() {
       setTimeout(() => setCopied(false), 1200);
     } catch {
       // fallback: no-op
+    }
+  }
+
+  async function onCopyPrompt() {
+    if (!finalPrompt) return;
+    try {
+      await navigator.clipboard.writeText(finalPrompt);
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 1200);
+    } catch {
+      // fallback sederhana
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = finalPrompt;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        setCopiedPrompt(true);
+        setTimeout(() => setCopiedPrompt(false), 1200);
+      } catch {
+        // no-op
+      }
     }
   }
 
@@ -154,7 +185,9 @@ export default function Page() {
           <div style={S.cardHead}>
             <div>
               <div style={S.cardTitle}>Response</div>
-              <div style={S.cardHint}>Hasil JSON akan tampil di bawah. Bisa kamu copy.</div>
+              <div style={S.cardHint}>
+                Hasil utama untuk Sora ada di <b>Final Prompt</b>. JSON tetap tampil untuk debug.
+              </div>
             </div>
 
             <button
@@ -178,9 +211,36 @@ export default function Page() {
 
             {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
 
-            {result ? (
-              <pre style={S.pre}>{prettyResult}</pre>
+            {/* Final Prompt box (yang dipakai di Sora) */}
+            {result && finalPrompt ? (
+              <div style={S.finalPromptBox}>
+                <div style={S.finalPromptHeader}>
+                  <div>
+                    <div style={S.finalPromptTitle}>Final Prompt (untuk Sora)</div>
+                    <div style={S.finalPromptHint}>Klik tombol untuk auto-copy, lalu paste ke prompt box Sora.</div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={onCopyPrompt}
+                    disabled={!finalPrompt}
+                    style={{
+                      ...S.smallBtn,
+                      opacity: finalPrompt ? 1 : 0.5,
+                      cursor: finalPrompt ? 'pointer' : 'not-allowed',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {copiedPrompt ? 'Copied ✅' : 'Copy Prompt'}
+                  </button>
+                </div>
+
+                <pre style={S.pre}>{finalPrompt}</pre>
+              </div>
             ) : null}
+
+            {/* Raw JSON */}
+            {result ? <pre style={S.pre}>{prettyResult}</pre> : null}
 
             {err ? (
               <div style={S.errorBox}>
@@ -367,6 +427,30 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: 120,
     overflow: 'hidden',
   },
+  finalPromptBox: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 14,
+    background: 'rgba(0,0,0,0.22)',
+    border: '1px solid rgba(76,245,219,0.20)',
+  },
+  finalPromptHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 10,
+    flexWrap: 'wrap',
+  },
+  finalPromptTitle: {
+    fontSize: 13,
+    fontWeight: 800,
+    marginBottom: 3,
+  },
+  finalPromptHint: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
   pre: {
     margin: 0,
     whiteSpace: 'pre-wrap',
@@ -406,3 +490,4 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.4,
   },
 };
+```0
