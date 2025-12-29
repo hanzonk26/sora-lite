@@ -11,7 +11,7 @@ export default function Home() {
         color: "white",
         fontFamily: "system-ui, sans-serif",
         textAlign: "center",
-        padding: "24px"
+        padding: "24px",
       }}
     >
       <h1 style={{ fontSize: "2.8rem", marginBottom: "8px" }}>
@@ -30,7 +30,7 @@ export default function Home() {
           background: "linear-gradient(135deg,#7c7cff,#00ffe1)",
           color: "#000",
           fontWeight: 600,
-          fontSize: "1rem"
+          fontSize: "1rem",
         }}
       >
         Generate Video (Demo)
