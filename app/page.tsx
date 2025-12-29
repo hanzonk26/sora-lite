@@ -1,341 +1,408 @@
-"use client";
+'use client';
 
-import React, { useMemo, useState } from "react";
-
-const EXAMPLE_PROMPT =
-  "Sweepy nonton film horor, sosok di TV makin mendekat, Sweepy gebuk TV pakai remote, suasana lucu tapi tegang.";
-
-function safeStringify(obj: any) {
-  try {
-    return JSON.stringify(obj, null, 2);
-  } catch {
-    return String(obj);
-  }
-}
+import React, { useMemo, useState } from 'react';
 
 export default function Page() {
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState('');
+  const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string>('');
+  const [copied, setCopied] = useState(false);
 
-  const [raw, setRaw] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const examplePrompt =
+    'Sweepy nonton film horor, sosok di TV makin mendekat, Sweepy gebuk TV pakai remote, suasana lucu tapi tegang';
 
-  const finalPrompt: string = useMemo(() => {
-    // Sesuaikan ini kalau struktur output kamu beda.
-    // Dari screenshot: raw.output.finalPrompt ada.
-    return raw?.output?.finalPrompt || "";
-  }, [raw]);
+  const canSubmit = prompt.trim().length > 0 && !loading;
 
-  const canCopy = (text: string) => typeof text === "string" && text.trim().length > 0;
+  const prettyResult = useMemo(() => {
+    if (!result) return '';
+    try {
+      return JSON.stringify(result, null, 2);
+    } catch {
+      return String(result);
+    }
+  }, [result]);
 
   async function onGenerate() {
-    setError(null);
-    setRaw(null);
-
-    const text = prompt.trim();
-    if (!text) {
-      setError("Prompt tidak boleh kosong.");
+    const p = prompt.trim();
+    if (!p) {
+      setErr('Prompt tidak boleh kosong.');
       return;
     }
 
+    setErr('');
+    setResult(null);
     setLoading(true);
+
     try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt: text }),
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: p }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        throw new Error(data?.error || `Request gagal (${res.status})`);
+        const msg =
+          data?.error ||
+          data?.message ||
+          `Request gagal (HTTP ${res.status}). Cek logs Vercel.`;
+        throw new Error(msg);
       }
 
-      setRaw(data);
+      setResult(data);
     } catch (e: any) {
-      setError(e?.message || "Terjadi error.");
+      setErr(e?.message || 'Terjadi error.');
     } finally {
       setLoading(false);
     }
   }
 
-  async function copyText(text: string, okMsg: string) {
+  async function onCopy() {
+    if (!prettyResult) return;
     try {
-      await navigator.clipboard.writeText(text);
-      alert(okMsg);
+      await navigator.clipboard.writeText(prettyResult);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
     } catch {
-      // fallback
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      alert(okMsg);
+      // fallback: no-op
     }
   }
 
-  const styles: Record<string, React.CSSProperties> = {
-    page: {
-      minHeight: "100vh",
-      padding: "20px 14px 28px",
-      display: "flex",
-      justifyContent: "center",
-      background:
-        "radial-gradient(1200px 800px at 50% 0%, rgba(0,255,204,0.10), rgba(0,0,0,0) 60%), linear-gradient(180deg, #0a1b1a 0%, #050607 70%, #050607 100%)",
-      color: "#eaf6f4",
-      fontFamily:
-        'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"',
-    },
-    container: {
-      width: "100%",
-      maxWidth: 720,
-      display: "flex",
-      flexDirection: "column",
-      gap: 14,
-    },
-    header: {
-      padding: "8px 8px 2px",
-    },
-    title: {
-      margin: 0,
-      fontSize: 40,
-      letterSpacing: 2,
-      fontWeight: 800,
-      lineHeight: 1,
-    },
-    subtitle: {
-      margin: "10px 0 0",
-      opacity: 0.85,
-      fontSize: 14,
-    },
-    card: {
-      borderRadius: 18,
-      padding: 14,
-      background: "rgba(255,255,255,0.06)",
-      border: "1px solid rgba(255,255,255,0.10)",
-      boxShadow: "0 16px 40px rgba(0,0,0,0.35)",
-      backdropFilter: "blur(10px)",
-    },
-    rowBetween: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 10,
-      flexWrap: "wrap",
-    },
-    label: {
-      fontSize: 14,
-      fontWeight: 700,
-      opacity: 0.95,
-    },
-    pillBtn: {
-      padding: "10px 12px",
-      borderRadius: 999,
-      border: "1px solid rgba(255,255,255,0.16)",
-      background: "rgba(255,255,255,0.06)",
-      color: "#eaf6f4",
-      cursor: "pointer",
-      fontWeight: 700,
-      fontSize: 13,
-    },
-    textarea: {
-      width: "100%",
-      minHeight: 140,
-      resize: "vertical",
-      padding: 14,
-      marginTop: 10,
-      borderRadius: 16,
-      border: "1px solid rgba(255,255,255,0.12)",
-      outline: "none",
-      background: "rgba(0,0,0,0.25)",
-      color: "#eaf6f4",
-      fontSize: 14,
-      lineHeight: 1.5,
-    },
-    primaryBtn: {
-      width: "100%",
-      marginTop: 12,
-      padding: "14px 14px",
-      borderRadius: 16,
-      border: "1px solid rgba(0,255,204,0.22)",
-      background: "linear-gradient(90deg, rgba(0,136,255,0.55), rgba(0,255,204,0.35))",
-      color: "#041212",
-      fontWeight: 900,
-      fontSize: 16,
-      cursor: "pointer",
-      boxShadow: "0 14px 30px rgba(0,0,0,0.35)",
-    },
-    helper: {
-      marginTop: 10,
-      fontSize: 12,
-      opacity: 0.75,
-      textAlign: "center",
-    },
-    error: {
-      marginTop: 10,
-      padding: "10px 12px",
-      borderRadius: 12,
-      background: "rgba(255, 70, 70, 0.12)",
-      border: "1px solid rgba(255, 70, 70, 0.25)",
-      color: "#ffd6d6",
-      fontSize: 13,
-    },
-    sectionTitle: {
-      margin: "6px 2px 0",
-      fontSize: 14,
-      fontWeight: 900,
-      letterSpacing: 0.3,
-      opacity: 0.95,
-    },
-    tabs: {
-      display: "flex",
-      gap: 8,
-      marginTop: 10,
-      flexWrap: "wrap",
-    },
-    tabBtn: (active: boolean): React.CSSProperties => ({
-      padding: "10px 12px",
-      borderRadius: 999,
-      border: "1px solid rgba(255,255,255,0.16)",
-      background: active ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.06)",
-      color: "#eaf6f4",
-      cursor: "pointer",
-      fontWeight: 800,
-      fontSize: 13,
-    }),
-    box: {
-      marginTop: 10,
-      borderRadius: 16,
-      border: "1px solid rgba(255,255,255,0.10)",
-      background: "rgba(0,0,0,0.24)",
-      padding: 12,
-    },
-    mono: {
-      fontFamily:
-        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-      fontSize: 12,
-      lineHeight: 1.5,
-      whiteSpace: "pre-wrap",
-      wordBreak: "break-word",
-      margin: 0,
-    },
-    actionsRow: {
-      display: "flex",
-      gap: 10,
-      justifyContent: "flex-end",
-      flexWrap: "wrap",
-      marginTop: 10,
-    },
-    smallBtn: {
-      padding: "10px 12px",
-      borderRadius: 14,
-      border: "1px solid rgba(255,255,255,0.14)",
-      background: "rgba(255,255,255,0.06)",
-      color: "#eaf6f4",
-      cursor: "pointer",
-      fontWeight: 800,
-      fontSize: 13,
-    },
-    footer: {
-      marginTop: 8,
-      textAlign: "center",
-      fontSize: 12,
-      opacity: 0.65,
-    },
-  };
-
-  const [tab, setTab] = useState<"prompt" | "json">("prompt");
+  const S = styles;
 
   return (
-    <main style={styles.page}>
-      <div style={styles.container}>
-        <header style={styles.header}>
-          <h1 style={styles.title}>SORA LITE</h1>
-          <p style={styles.subtitle}>Personal AI Video Practice</p>
+    <div style={S.page}>
+      <div style={S.bgGlow} />
+
+      <main style={S.container}>
+        <header style={S.header}>
+          <div style={S.brandRow}>
+            <div style={S.logoDot} />
+            <div>
+              <h1 style={S.title}>SORA LITE</h1>
+              <p style={S.subtitle}>Personal AI Video Practice</p>
+            </div>
+          </div>
+          <div style={S.badgeRow}>
+            <span style={S.badge}>Mobile-first</span>
+            <span style={S.badge}>Next.js App Router</span>
+            <span style={S.badge}>Demo UI</span>
+          </div>
         </header>
 
-        <section style={styles.card}>
-          <div style={styles.rowBetween}>
-            <div style={styles.label}>Prompt</div>
+        {/* Card: Prompt */}
+        <section style={S.card}>
+          <div style={S.cardHead}>
+            <div>
+              <div style={S.cardTitle}>Prompt</div>
+              <div style={S.cardHint}>
+                Tulis ide singkat. Nanti sistem bikin output JSON storyboard/prompt.
+              </div>
+            </div>
+
             <button
-              style={styles.pillBtn}
-              onClick={() => setPrompt(EXAMPLE_PROMPT)}
               type="button"
+              style={{ ...S.smallBtn, opacity: loading ? 0.6 : 1 }}
+              onClick={() => {
+                setPrompt(examplePrompt);
+                setErr('');
+              }}
               disabled={loading}
-              aria-label="Pakai contoh"
-              title="Pakai contoh"
             >
               Pakai contoh
             </button>
           </div>
 
           <textarea
-            style={styles.textarea}
-            placeholder='Contoh: "Sweepy nonton film horor, sosok mau keluar dari TV, lalu Sweepy gebuk pakai remote..."'
+            style={S.textarea}
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={(e) => {
+              setPrompt(e.target.value);
+              if (err) setErr('');
+            }}
+            placeholder={`Contoh:\n"${examplePrompt}"`}
+            rows={6}
           />
 
-          <button style={styles.primaryBtn} onClick={onGenerate} disabled={loading} type="button">
-            {loading ? "Generating..." : "Generate Video (Demo)"}
-          </button>
+          <div style={S.actionsRow}>
+            <button
+              type="button"
+              onClick={onGenerate}
+              disabled={!canSubmit}
+              style={{
+                ...S.primaryBtn,
+                opacity: canSubmit ? 1 : 0.55,
+                cursor: canSubmit ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {loading ? 'Generating…' : 'Generate Video (Demo)'}
+            </button>
 
-          {error ? <div style={styles.error}>{error}</div> : null}
-
-          <div style={styles.helper}>Endpoint: <b>/api/generate</b> (POST JSON)</div>
-        </section>
-
-        <section style={styles.card}>
-          <div style={styles.rowBetween}>
-            <div style={styles.sectionTitle}>Response</div>
-            <div style={styles.tabs}>
-              <button style={styles.tabBtn(tab === "prompt")} onClick={() => setTab("prompt")} type="button">
-                Prompt Sora
-              </button>
-              <button style={styles.tabBtn(tab === "json")} onClick={() => setTab("json")} type="button">
-                JSON
-              </button>
+            <div style={S.metaRight}>
+              <div style={S.metaLine}>
+                Endpoint: <code style={S.code}>POST /api/generate</code>
+              </div>
+              {err ? <div style={S.errorText}>{err}</div> : null}
             </div>
           </div>
-
-          {tab === "prompt" ? (
-            <div style={styles.box}>
-              <pre style={styles.mono}>
-                {finalPrompt ? finalPrompt : "Belum ada hasil. Klik Generate dulu."}
-              </pre>
-
-              <div style={styles.actionsRow}>
-                <button
-                  style={styles.smallBtn}
-                  type="button"
-                  disabled={!canCopy(finalPrompt)}
-                  onClick={() => copyText(finalPrompt, "✅ Prompt Sora berhasil dicopy!")}
-                >
-                  Copy Prompt Sora
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div style={styles.box}>
-              <pre style={styles.mono}>{raw ? safeStringify(raw) : "Belum ada hasil."}</pre>
-
-              <div style={styles.actionsRow}>
-                <button
-                  style={styles.smallBtn}
-                  type="button"
-                  disabled={!raw}
-                  onClick={() => copyText(safeStringify(raw), "✅ JSON berhasil dicopy!")}
-                >
-                  Copy JSON
-                </button>
-              </div>
-            </div>
-          )}
         </section>
 
-        <div style={styles.footer}>Demo UI • Next.js App Router • Mobile-first</div>
-      </div>
-    </main>
+        {/* Card: Response */}
+        <section style={S.card}>
+          <div style={S.cardHead}>
+            <div>
+              <div style={S.cardTitle}>Response</div>
+              <div style={S.cardHint}>Hasil JSON akan tampil di bawah. Bisa kamu copy.</div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onCopy}
+              disabled={!prettyResult}
+              style={{
+                ...S.smallBtn,
+                opacity: prettyResult ? 1 : 0.5,
+                cursor: prettyResult ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {copied ? 'Copied ✅' : 'Copy JSON'}
+            </button>
+          </div>
+
+          <div style={S.resultBox}>
+            {!result && !loading && !err ? (
+              <div style={S.emptyState}>Belum ada hasil.</div>
+            ) : null}
+
+            {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
+
+            {result ? (
+              <pre style={S.pre}>{prettyResult}</pre>
+            ) : null}
+
+            {err ? (
+              <div style={S.errorBox}>
+                <div style={S.errorTitle}>Error</div>
+                <div style={S.errorMsg}>{err}</div>
+              </div>
+            ) : null}
+          </div>
+
+          <div style={S.footerNote}>
+            Tips: untuk test endpoint di browser, buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup.
+            Generate beneran pakai POST dari tombol.
+          </div>
+        </section>
+      </main>
+    </div>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    minHeight: '100vh',
+    background: 'linear-gradient(180deg, #0b1b1e 0%, #070a0f 60%, #05060a 100%)',
+    color: 'rgba(255,255,255,0.92)',
+    padding: '18px 14px 28px',
+    fontFamily:
+      'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"',
+    position: 'relative',
+    overflowX: 'hidden',
+  },
+  bgGlow: {
+    position: 'absolute',
+    inset: '-40px',
+    background:
+      'radial-gradient(600px 280px at 20% 10%, rgba(70,255,220,0.12), transparent 60%), radial-gradient(500px 240px at 85% 20%, rgba(90,140,255,0.10), transparent 55%)',
+    filter: 'blur(6px)',
+    pointerEvents: 'none',
+  },
+  container: {
+    maxWidth: 860,
+    margin: '0 auto',
+    position: 'relative',
+  },
+  header: {
+    marginBottom: 14,
+  },
+  brandRow: {
+    display: 'flex',
+    gap: 12,
+    alignItems: 'center',
+  },
+  logoDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 999,
+    background: 'linear-gradient(90deg, #4cf5db, #6aa9ff)',
+    boxShadow: '0 0 24px rgba(76,245,219,0.28)',
+    flexShrink: 0,
+  },
+  title: {
+    margin: 0,
+    fontSize: 34,
+    letterSpacing: 1.2,
+    lineHeight: 1.05,
+    fontWeight: 800,
+  },
+  subtitle: {
+    margin: '6px 0 0',
+    opacity: 0.72,
+    fontSize: 14,
+  },
+  badgeRow: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginTop: 10,
+  },
+  badge: {
+    fontSize: 12,
+    padding: '6px 10px',
+    borderRadius: 999,
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.10)',
+    opacity: 0.9,
+  },
+  card: {
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.10)',
+    borderRadius: 18,
+    padding: 14,
+    boxShadow: '0 12px 40px rgba(0,0,0,0.28)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    marginTop: 12,
+  },
+  cardHead: {
+    display: 'flex',
+    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: 700,
+    marginBottom: 4,
+  },
+  cardHint: {
+    fontSize: 12,
+    opacity: 0.72,
+    lineHeight: 1.35,
+    maxWidth: 520,
+  },
+  textarea: {
+    width: '100%',
+    resize: 'vertical',
+    minHeight: 120,
+    padding: '12px 12px',
+    borderRadius: 14,
+    background: 'rgba(0,0,0,0.35)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    color: 'rgba(255,255,255,0.92)',
+    outline: 'none',
+    fontSize: 14,
+    lineHeight: 1.5,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+  },
+  actionsRow: {
+    display: 'flex',
+    gap: 12,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    flexWrap: 'wrap',
+  },
+  primaryBtn: {
+    padding: '12px 14px',
+    borderRadius: 14,
+    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'linear-gradient(90deg, rgba(76,245,219,0.35), rgba(106,169,255,0.25))',
+    color: 'rgba(255,255,255,0.92)',
+    fontWeight: 800,
+    letterSpacing: 0.2,
+    width: '100%',
+    maxWidth: 360,
+    boxShadow: '0 10px 24px rgba(0,0,0,0.25)',
+  },
+  smallBtn: {
+    padding: '10px 12px',
+    borderRadius: 999,
+    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'rgba(255,255,255,0.06)',
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: 700,
+    fontSize: 13,
+  },
+  metaRight: {
+    flex: 1,
+    minWidth: 200,
+  },
+  metaLine: {
+    fontSize: 12,
+    opacity: 0.75,
+    marginTop: 2,
+  },
+  code: {
+    fontSize: 12,
+    padding: '2px 6px',
+    borderRadius: 8,
+    background: 'rgba(255,255,255,0.07)',
+    border: '1px solid rgba(255,255,255,0.10)',
+  },
+  errorText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: 'rgba(255,120,120,0.95)',
+    fontWeight: 700,
+  },
+  resultBox: {
+    background: 'rgba(0,0,0,0.35)',
+    border: '1px solid rgba(255,255,255,0.10)',
+    borderRadius: 14,
+    padding: 12,
+    minHeight: 120,
+    overflow: 'hidden',
+  },
+  pre: {
+    margin: 0,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+    fontSize: 12,
+    lineHeight: 1.5,
+    color: 'rgba(255,255,255,0.92)',
+  },
+  emptyState: {
+    fontSize: 13,
+    opacity: 0.65,
+  },
+  loadingState: {
+    fontSize: 13,
+    opacity: 0.85,
+  },
+  errorBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 12,
+    border: '1px solid rgba(255,120,120,0.35)',
+    background: 'rgba(255,120,120,0.08)',
+  },
+  errorTitle: {
+    fontWeight: 800,
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  errorMsg: {
+    fontSize: 12,
+    opacity: 0.9,
+  },
+  footerNote: {
+    marginTop: 10,
+    fontSize: 12,
+    opacity: 0.7,
+    lineHeight: 1.4,
+  },
+};
