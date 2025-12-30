@@ -1,21 +1,44 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 type PresetKey = 'sweepy' | 'hanz26';
 type NicheKey = 'daily' | 'horror' | 'funny' | 'ugc' | 'fitness';
+
+type ApiResult = {
+  ok?: boolean;
+  input?: any;
+  output?: {
+    title?: string;
+    hook?: string;
+    styleKey?: string;
+    style?: string;
+    storyboard?: any[];
+    finalPrompt?: string;
+  };
+  error?: string;
+  message?: string;
+  detail?: string;
+};
 
 type SavedItem = {
   id: string;
   dateKey: string; // YYYY-MM-DD
   preset: PresetKey;
   niche: NicheKey;
+
+  // base idea (local)
   title: string;
   hook: string;
   scene: string;
-  finalPrompt: string;
+
+  // refined (API)
+  finalPrompt: string; // prefer API finalPrompt
+  apiJson?: ApiResult;
+
   caption: string;
   hashtags: string;
+
   createdAt: number;
 };
 
@@ -28,7 +51,7 @@ function todayKey() {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-// Deterministic RNG (mulberry32)
+// Deterministic RNG (mulberry32) — biar “ide hari ini” konsisten
 function mulberry32(seed: number) {
   return function () {
     let t = (seed += 0x6d2b79f5);
@@ -143,12 +166,11 @@ function buildDailyIdea(dateKey: string, preset: PresetKey, niche: NicheKey) {
 
   const location = pick(rng, places);
 
-  // Build title + hook + 1 scene + final prompt
   let title = '';
   let hook = '';
   let scene = '';
-  let finalPrompt = '';
   let caption = pick(rng, captions);
+  let hashtags = '';
 
   if (preset === 'sweepy') {
     const baseAction = pick(rng, sweepyDaily);
@@ -160,6 +182,7 @@ function buildDailyIdea(dateKey: string, preset: PresetKey, niche: NicheKey) {
         rng,
         sweepyHorrorLight
       )}. Tetap aman, natural, lalu ending lucu tipis (Sweepy lega/nyengir kecil).`;
+      hashtags = [...tagsCommon, ...tagsHorror].slice(0, 12).join(' ');
     } else if (niche === 'funny') {
       title = 'Sweepy: Daily Komedi Natural';
       hook = '“Gue cuma mau santai… kok jadi gini?”';
@@ -167,10 +190,12 @@ function buildDailyIdea(dateKey: string, preset: PresetKey, niche: NicheKey) {
         rng,
         sweepyFunnyTwist
       )}. Ekspresi jelas, timing pas, realistis.`;
+      hashtags = [...tagsCommon, ...tagsFunny].slice(0, 12).join(' ');
     } else if (niche === 'ugc') {
       title = 'Sweepy: UGC Vibe (Lucu & Santai)';
       hook = '“POV: kamu jadi Sweepy sehari…”';
       scene = `@mockey.mo (Sweepy) bikin vlog UGC di ${location}. ${baseAction}. Gaya handheld, natural lighting, vibe autentik.`;
+      hashtags = [...tagsCommon, ...tagsUGC].slice(0, 12).join(' ');
     } else if (niche === 'fitness') {
       title = 'Sweepy: Sehat Versi Santai';
       hook = '“Versi paling gampang dulu…”';
@@ -178,43 +203,15 @@ function buildDailyIdea(dateKey: string, preset: PresetKey, niche: NicheKey) {
         rng,
         fitnessActions
       )}. Gaya lucu tipis tapi tetap realistis dan aman.`;
+      hashtags = [...tagsCommon, ...tagsFitness].slice(0, 12).join(' ');
     } else {
       title = 'Sweepy: Daily Natural';
       hook = '“Ini kegiatan paling random tapi nyaman…”';
       scene = `@mockey.mo (Sweepy) di ${location}, ${baseAction}. Aktivitas sederhana tanpa konflik besar, vibe hangat seperti daily vlog.`;
+      hashtags = [...tagsCommon, '#dailyvlog'].slice(0, 12).join(' ');
     }
 
-    const tags =
-      niche === 'horror'
-        ? [...tagsCommon, ...tagsHorror]
-        : niche === 'funny'
-          ? [...tagsCommon, ...tagsFunny]
-          : niche === 'ugc'
-            ? [...tagsCommon, ...tagsUGC]
-            : niche === 'fitness'
-              ? [...tagsCommon, ...tagsFitness]
-              : [...tagsCommon, '#dailyvlog'];
-
-    const hashtags = tags.slice(0, 12).join(' ');
-
-    finalPrompt = [
-      `Create a short video (single scene, 10–15 seconds).`,
-      `Main character: @mockey.mo (Sweepy).`,
-      `Scene: ${scene}`,
-      `Style: cinematic but natural, stable subject, coherent motion, no sudden teleport, no text overlay.`,
-      `Camera: medium shot with gentle handheld or slow push-in.`,
-      `Lighting: soft natural or warm practical lighting (match the location).`,
-      `Ending: clean finish, 1–2 seconds hold.`,
-    ].join(' ');
-
-    return {
-      title,
-      hook,
-      scene,
-      finalPrompt,
-      caption,
-      hashtags,
-    };
+    return { title, hook, scene, caption, hashtags };
   }
 
   // hanz26
@@ -224,67 +221,54 @@ function buildDailyIdea(dateKey: string, preset: PresetKey, niche: NicheKey) {
     scene = `@hanz26 duduk santai gaya UGC di ${location}. Buka dengan hook: ${hook} Lanjut bahas: ${pick(
       rng,
       hanzTopicsUGC
-    )}. Bahasa Indonesia, ekspresi natural, vibe relatable, handheld smartphone.`;
+    )}. Bahasa Indonesia, natural, vibe relatable, handheld smartphone.`;
+    hashtags = [...tagsCommon, ...tagsUGC].slice(0, 12).join(' ');
   } else if (niche === 'fitness') {
     title = 'Fitness Habit: @hanz26';
     hook = '“Gue bikin ini sesimpel mungkin…”';
     scene = `@hanz26 di ${location}, jelasin 1 habit sehat + demo singkat: ${pick(
       rng,
       fitnessActions
-    )}. Bahasa Indonesia, natural, tidak berlebihan, fokus konsistensi.`;
+    )}. Bahasa Indonesia, natural, fokus konsistensi.`;
+    hashtags = [...tagsCommon, ...tagsFitness].slice(0, 12).join(' ');
   } else if (niche === 'funny') {
     title = 'Relatable Funny: @hanz26';
     hook = '“Gue kira mudah… ternyata…”';
     scene = `@hanz26 di ${location}, cerita singkat lucu-relatable tentang kebiasaan sehat/produktif yang sering gagal, lalu kasih 1 solusi kecil. Natural, ekspresi jelas.`;
+    hashtags = [...tagsCommon, ...tagsFunny].slice(0, 12).join(' ');
   } else if (niche === 'horror') {
     title = 'Story Tipis Horor: @hanz26';
     hook = '“Gue ngalamin hal aneh semalem…”';
     scene = `@hanz26 di ${location}, cerita horor ringan (aman, tanpa gore) dengan ending lega/komedi tipis. Bahasa Indonesia, tone tegang tapi tetap kalem.`;
+    hashtags = [...tagsCommon, ...tagsHorror].slice(0, 12).join(' ');
   } else {
     title = 'Daily Talk: @hanz26';
     hook = pick(rng, hanzHooks);
     scene = `@hanz26 di ${location}, ngobrol singkat soal 1 kebiasaan kecil yang bikin hidup lebih sehat. Bahasa Indonesia, natural, friendly, lighting bagus.`;
+    hashtags = [...tagsCommon, '#daily'].slice(0, 12).join(' ');
   }
 
-  const tags =
-    niche === 'horror'
-      ? [...tagsCommon, ...tagsHorror]
-      : niche === 'funny'
-        ? [...tagsCommon, ...tagsFunny]
-        : niche === 'ugc'
-          ? [...tagsCommon, ...tagsUGC]
-          : niche === 'fitness'
-            ? [...tagsCommon, ...tagsFitness]
-            : [...tagsCommon, '#daily'];
-
-  const hashtags = tags.slice(0, 12).join(' ');
-
-  finalPrompt = [
-    `Create a short UGC-style video (single scene, 10–15 seconds).`,
-    `Main character: @hanz26.`,
-    `Scene: ${scene}`,
-    `Style: handheld smartphone feel, natural skin tones, clean audio vibe (no need to include actual audio), no text overlay.`,
-    `Camera: chest-up framing, slight handheld motion, eye contact with camera.`,
-    `Lighting: soft natural light or warm indoor practical lighting.`,
-    `Ending: simple closing line + small smile, 1 second hold.`,
-  ].join(' ');
-
-  return { title, hook, scene, finalPrompt, caption, hashtags };
+  return { title, hook, scene, caption, hashtags };
 }
 
-const LS_KEY = 'sora_lite_daily_library_v1';
+const LS_KEY = 'sora_lite_daily_library_v2';
 
 export default function Page() {
   const [preset, setPreset] = useState<PresetKey>('sweepy');
   const [niche, setNiche] = useState<NicheKey>('daily');
   const [dateKey, setDateKey] = useState<string>(todayKey());
-  const [output, setOutput] = useState<ReturnType<typeof buildDailyIdea> | null>(null);
+
+  const [idea, setIdea] = useState<ReturnType<typeof buildDailyIdea> | null>(null);
+
+  const [apiResult, setApiResult] = useState<ApiResult | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
-
   const [library, setLibrary] = useState<SavedItem[]>([]);
   const [err, setErr] = useState<string>('');
+
+  const outputRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     try {
@@ -304,28 +288,68 @@ export default function Page() {
     }
   }
 
-  const canGenerate = true;
-
   const headerSub = useMemo(() => {
     return `${PRESET_LABEL[preset].emoji} ${PRESET_LABEL[preset].title} • ${NICHE_LABEL[niche].title} • ${dateKey}`;
   }, [preset, niche, dateKey]);
 
-  function onGenerateToday() {
+  const refinedFinalPrompt = useMemo(() => {
+    const fp = apiResult?.output?.finalPrompt;
+    return fp ? String(fp) : '';
+  }, [apiResult]);
+
+  async function callGenerateAPI(promptText: string) {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // preset dikirim juga (kalau backend nanti mau pakai). Kalau backend belum pakai, aman.
+      body: JSON.stringify({ prompt: promptText, preset }),
+    });
+
+    const data: ApiResult = await res.json().catch(() => ({} as any));
+
+    if (!res.ok) {
+      const msg = (data as any)?.error || (data as any)?.message || `Request gagal (HTTP ${res.status}).`;
+      throw new Error(msg);
+    }
+
+    return data;
+  }
+
+  async function onGenerateToday() {
     setErr('');
     setCopied(false);
     setSaved(false);
+    setIdea(null);
+    setApiResult(null);
+
     try {
-      const idea = buildDailyIdea(dateKey, preset, niche);
-      setOutput(idea);
+      setLoading(true);
+
+      // 1) generate “scene 1” harian (konsisten)
+      const nextIdea = buildDailyIdea(dateKey, preset, niche);
+      setIdea(nextIdea);
+
+      // 2) refine via backend /api/generate
+      const api = await callGenerateAPI(nextIdea.scene);
+      setApiResult(api);
+
+      // 3) scroll ke output
+      setTimeout(() => {
+        outputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     } catch (e: any) {
       setErr(e?.message || 'Gagal generate.');
+    } finally {
+      setLoading(false);
     }
   }
 
   async function onCopyFinal() {
-    if (!output?.finalPrompt) return;
+    const text = refinedFinalPrompt || '';
+    if (!text) return;
+
     try {
-      await navigator.clipboard.writeText(output.finalPrompt);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     } catch {
@@ -334,20 +358,29 @@ export default function Page() {
   }
 
   function onSave() {
-    if (!output) return;
+    if (!idea) return;
+
+    const finalPrompt = refinedFinalPrompt || '';
+    if (!finalPrompt) {
+      setErr('Final Prompt dari API belum ada. Coba Generate lagi.');
+      return;
+    }
+
     const item: SavedItem = {
       id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
       dateKey,
       preset,
       niche,
-      title: output.title,
-      hook: output.hook,
-      scene: output.scene,
-      finalPrompt: output.finalPrompt,
-      caption: output.caption,
-      hashtags: output.hashtags,
+      title: idea.title,
+      hook: idea.hook,
+      scene: idea.scene,
+      finalPrompt,
+      apiJson: apiResult || undefined,
+      caption: idea.caption,
+      hashtags: idea.hashtags,
       createdAt: Date.now(),
     };
+
     const next = [item, ...library].slice(0, 200);
     persist(next);
     setSaved(true);
@@ -363,48 +396,62 @@ export default function Page() {
     setPreset(item.preset);
     setNiche(item.niche);
     setDateKey(item.dateKey);
-    setOutput({
+
+    setIdea({
       title: item.title,
       hook: item.hook,
       scene: item.scene,
-      finalPrompt: item.finalPrompt,
       caption: item.caption,
       hashtags: item.hashtags,
     });
+
+    setApiResult(item.apiJson || { ok: true, output: { finalPrompt: item.finalPrompt } });
     setCopied(false);
     setSaved(false);
     setErr('');
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
+  // tampilkan JSON (optional) kalau mau debug
+  const prettyApi = useMemo(() => {
+    if (!apiResult) return '';
+    try {
+      return JSON.stringify(apiResult, null, 2);
+    } catch {
+      return String(apiResult);
+    }
+  }, [apiResult]);
 
   const S = styles;
 
   return (
     <div style={S.page}>
       <div style={S.bgGlow} />
+
       <main style={S.container}>
         <header style={S.header}>
           <div style={S.brandRow}>
             <div style={S.logoDot} />
             <div>
               <h1 style={S.title}>SORA LITE</h1>
-              <p style={S.subtitle}>Daily Content Generator (no API)</p>
+              <p style={S.subtitle}>Daily Content Generator → Refine via /api/generate</p>
             </div>
           </div>
 
           <div style={S.badgeRow}>
             <span style={S.badge}>Mobile-first</span>
             <span style={S.badge}>1 scene</span>
-            <span style={S.badge}>Copy prompt</span>
+            <span style={S.badge}>API refine</span>
           </div>
 
           <div style={S.subLine}>{headerSub}</div>
         </header>
 
-        {/* Controls */}
+        {/* Settings */}
         <section style={S.card}>
           <div style={S.cardTitle}>Daily Settings</div>
-          <div style={S.cardHint}>Pilih preset & niche. Klik Generate untuk ide harian yang konsisten.</div>
+          <div style={S.cardHint}>Klik Generate → ide harian (scene) → otomatis di-refine jadi Final Prompt oleh API.</div>
 
           <div style={S.grid2}>
             <div>
@@ -418,6 +465,7 @@ export default function Page() {
                       type="button"
                       onClick={() => setPreset(k)}
                       style={{ ...S.presetBtn, ...(active ? S.presetBtnActive : null) }}
+                      disabled={loading}
                     >
                       <div style={S.presetTop}>
                         <span style={S.presetEmoji}>{PRESET_LABEL[k].emoji}</span>
@@ -441,6 +489,7 @@ export default function Page() {
                       type="button"
                       onClick={() => setNiche(k)}
                       style={{ ...S.nicheBtn, ...(active ? S.nicheBtnActive : null) }}
+                      disabled={loading}
                     >
                       <div style={{ fontWeight: 900 }}>{NICHE_LABEL[k].title}</div>
                       <div style={{ fontSize: 12, opacity: 0.75 }}>{NICHE_LABEL[k].hint}</div>
@@ -456,74 +505,87 @@ export default function Page() {
                   value={dateKey}
                   onChange={(e) => setDateKey(e.target.value || todayKey())}
                   style={S.input}
+                  disabled={loading}
                 />
-                <div style={S.smallHint}>Kalau kamu ganti tanggal, idenya ikut berubah (buat simulasi).</div>
+                <div style={S.smallHint}>Ganti tanggal → idenya berubah (buat simulasi).</div>
               </div>
             </div>
           </div>
 
           <div style={S.actionsRow}>
-            <button
-              type="button"
-              onClick={onGenerateToday}
-              style={{ ...S.primaryBtn, opacity: canGenerate ? 1 : 0.6 }}
-              disabled={!canGenerate}
-            >
-              Generate Ide Hari Ini
+            <button type="button" onClick={onGenerateToday} style={S.primaryBtn} disabled={loading}>
+              {loading ? 'Generating…' : 'Generate Ide Hari Ini'}
             </button>
 
             <div style={S.rightMeta}>
-              {err ? <div style={S.errorText}>{err}</div> : <div style={S.muted}>Tip: simpan yang bagus ke Library.</div>}
+              <div style={S.metaLine}>
+                Endpoint: <code style={S.code}>POST /api/generate</code>
+              </div>
+              <div style={S.metaLine}>
+                Payload: <code style={S.code}>{`{ prompt: scene, preset: "${preset}" }`}</code>
+              </div>
+              {err ? <div style={S.errorText}>{err}</div> : <div style={S.muted}>Tip: Save yang bagus ke Library.</div>}
             </div>
           </div>
         </section>
 
         {/* Output */}
-        <section style={S.card}>
+        <section style={S.card} ref={outputRef}>
           <div style={S.cardHead}>
             <div>
               <div style={S.cardTitle}>Output</div>
-              <div style={S.cardHint}>Copy bagian Final Prompt lalu paste ke Sora.</div>
+              <div style={S.cardHint}>Final Prompt di bawah ini dari API. Tinggal Copy → paste ke Sora.</div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <button type="button" onClick={onCopyFinal} style={S.smallBtn} disabled={!output?.finalPrompt}>
+              <button type="button" onClick={onCopyFinal} style={S.smallBtn} disabled={!refinedFinalPrompt}>
                 {copied ? 'Copied ✅' : 'Copy Final Prompt'}
               </button>
-              <button type="button" onClick={onSave} style={S.smallBtn} disabled={!output}>
+              <button type="button" onClick={onSave} style={S.smallBtn} disabled={!idea || !refinedFinalPrompt}>
                 {saved ? 'Saved ✅' : 'Save'}
               </button>
             </div>
           </div>
 
-          {!output ? (
+          {!idea ? (
             <div style={S.emptyState}>Belum ada hasil. Klik “Generate Ide Hari Ini”.</div>
           ) : (
             <div style={S.outputGrid}>
               <div style={S.kv}>
                 <div style={S.k}>Judul</div>
-                <div style={S.v}>{output.title}</div>
+                <div style={S.v}>{idea.title}</div>
               </div>
               <div style={S.kv}>
                 <div style={S.k}>Hook</div>
-                <div style={S.v}>{output.hook}</div>
+                <div style={S.v}>{idea.hook}</div>
               </div>
               <div style={S.kv}>
-                <div style={S.k}>Scene (1)</div>
-                <div style={S.v}>{output.scene}</div>
+                <div style={S.k}>Scene (input untuk API)</div>
+                <div style={S.v}>{idea.scene}</div>
               </div>
 
               <div style={S.kv}>
-                <div style={S.k}>Final Prompt</div>
-                <pre style={S.pre}>{output.finalPrompt}</pre>
+                <div style={S.k}>Final Prompt (API)</div>
+                {!refinedFinalPrompt && loading ? (
+                  <div style={S.v}>Sedang refine via API…</div>
+                ) : refinedFinalPrompt ? (
+                  <pre style={S.pre}>{refinedFinalPrompt}</pre>
+                ) : (
+                  <div style={S.v}>Belum ada Final Prompt (API). Cek error / coba Generate lagi.</div>
+                )}
               </div>
 
               <div style={S.kv}>
                 <div style={S.k}>Caption</div>
-                <div style={S.v}>{output.caption}</div>
+                <div style={S.v}>{idea.caption}</div>
               </div>
               <div style={S.kv}>
                 <div style={S.k}>Hashtags</div>
-                <div style={S.v}>{output.hashtags}</div>
+                <div style={S.v}>{idea.hashtags}</div>
+              </div>
+
+              <div style={S.kv}>
+                <div style={S.k}>Debug (API JSON)</div>
+                <pre style={S.pre}>{prettyApi || 'Belum ada.'}</pre>
               </div>
             </div>
           )}
@@ -634,6 +696,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   label: { fontSize: 12, opacity: 0.8, fontWeight: 900, marginBottom: 8 },
   grid2: { display: 'grid', gridTemplateColumns: '1fr', gap: 14 },
+
   presetRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
   presetBtn: {
     textAlign: 'left',
@@ -642,6 +705,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,255,255,0.12)',
     background: 'rgba(255,255,255,0.04)',
     color: 'rgba(255,255,255,0.92)',
+    cursor: 'pointer',
   },
   presetBtnActive: {
     border: '1px solid rgba(76,245,219,0.35)',
@@ -661,6 +725,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,255,255,0.12)',
     background: 'rgba(0,0,0,0.25)',
     color: 'rgba(255,255,255,0.92)',
+    cursor: 'pointer',
   },
   nicheBtnActive: {
     border: '1px solid rgba(106,169,255,0.45)',
@@ -693,9 +758,17 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 10px 24px rgba(0,0,0,0.25)',
     cursor: 'pointer',
   },
-  rightMeta: { flex: 1, minWidth: 200 },
+  rightMeta: { flex: 1, minWidth: 220 },
+  metaLine: { fontSize: 12, opacity: 0.75, marginTop: 4 },
+  code: {
+    fontSize: 12,
+    padding: '2px 6px',
+    borderRadius: 8,
+    background: 'rgba(255,255,255,0.07)',
+    border: '1px solid rgba(255,255,255,0.10)',
+  },
   muted: { fontSize: 12, opacity: 0.75 },
-  errorText: { fontSize: 12, color: 'rgba(255,120,120,0.95)', fontWeight: 900 },
+  errorText: { fontSize: 12, color: 'rgba(255,120,120,0.95)', fontWeight: 900, marginTop: 6 },
 
   smallBtn: {
     padding: '10px 12px',
@@ -771,7 +844,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-// Small responsive tweak
+// Simple mobile layout improvement
 if (typeof window !== 'undefined') {
-  // no-op (kept to avoid lint unused in some configs)
+  // noop
 }
