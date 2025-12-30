@@ -2,7 +2,7 @@
 
 import React, { useMemo, useRef, useState } from 'react';
 
-type PresetKey = 'sweepy' | 'hanz26';
+type PresetKey = 'sweepy' | 'hanz26' | 'reference';
 
 export default function Page() {
   const [preset, setPreset] = useState<PresetKey>('sweepy');
@@ -17,7 +17,8 @@ export default function Page() {
 
   const presetLabel: Record<PresetKey, { title: string; sub: string; emoji: string }> = {
     sweepy: { title: 'Sweepy', sub: '@mockey.mo', emoji: '🐵' },
-    hanz26: { title: '@hanz26', sub: 'AI version', emoji: '🧑' },
+    hanz26: { title: '@hanz26', sub: 'UGC (Indonesia)', emoji: '🧑' },
+    reference: { title: 'Reference Photo', sub: 'Upload foto di Sora', emoji: '🖼️' },
   };
 
   const canSubmit = prompt.trim().length > 0 && !loading;
@@ -39,23 +40,23 @@ export default function Page() {
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
-  // ✅ Sweepy daily generator (mix daily/funny/hero/horror ringan)
-  function makeSweepyDaily() {
+  // ✅ Sweepy generator (1 scene, 6s, daily/funny/hero/horror ringan)
+  function makeSweepyIdea() {
     const places = [
-      'warung kopi sepi',
+      'warung kopi kecil yang sepi',
       'teras rumah sore hari',
       'kamar kos sederhana',
-      'pinggir jalan kecil',
       'ruang tamu dengan TV tua',
       'halaman belakang rumah',
-      'taman kecil dekat rumah',
       'dapur sederhana malam hari',
+      'taman kecil dekat rumah',
+      'pinggir jalan kecil saat mendung',
     ];
 
     const dailyActions = [
       'duduk santai sambil ngopi',
       'rebahan sambil main HP',
-      'menyapu halaman dengan gerakan malas tapi lucu',
+      'menyapu halaman dengan gaya malas tapi lucu',
       'makan mie instan dengan ekspresi super serius',
       'nonton TV sambil ngemil pelan',
       'membersihkan meja kecil dengan teliti',
@@ -66,61 +67,60 @@ export default function Page() {
     const funnyTwists = [
       'gelas kopinya hampir jatuh lalu diselamatkan dengan ekspresi panik',
       'Sweepy sadar kamera lalu langsung sok cool',
-      'Sweepy bengong lama lalu baru sadar ada suara notifikasi',
-      'Sweepy kaget suara kecil lalu cek sekeliling dengan gaya dramatis',
-      'Sweepy refleks melakukan hal konyol tanpa sadar lalu malu sendiri',
-      'Sweepy salah ambil remote, malah pencet tombol yang bikin TV mute lalu nyari-nyari',
+      'Sweepy bengong lama lalu baru sadar ada notifikasi',
+      'Sweepy kaget suara kecil lalu cek sekeliling dengan gaya dramatis (ternyata aman)',
+      'Sweepy refleks melakukan hal konyol lalu malu sendiri',
+      'Sweepy salah ambil remote, pencet mute, lalu nyari-nyari tombolnya',
     ];
 
     const heroMoments = [
-      'membantu anak kucing kecil menyeberang pelan-pelan',
       'memungut sampah plastik dan membuangnya ke tempat sampah',
       'membereskan barang yang hampir jatuh dari meja',
-      'menolong hewan kecil yang terlihat kebingungan mencari jalan',
+      'menolong anak kucing kecil yang kebingungan',
       'membantu orang tua membawa barang ringan dengan sopan',
+      'menutup pintu yang berderit agar tidak mengganggu orang lain',
     ];
 
     const horrorLight = [
+      'suara TV berubah statis 1–2 detik lalu normal lagi',
       'bayangan aneh muncul sebentar lalu hilang (ternyata pantulan)',
-      'suara TV berubah statis beberapa detik lalu normal lagi',
       'pintu berderit pelan, Sweepy menoleh… ternyata angin',
       'pantulan kaca terlihat aneh, tapi cuma efek cahaya',
     ];
 
     const mode = pick(['daily', 'funny', 'hero', 'horror'] as const);
+    const base = `@mockey.mo (Sweepy) di ${pick(places)}, ${pick(dailyActions)}.`;
 
     if (mode === 'hero') {
-      return `@mockey.mo (Sweepy) berada di ${pick(places)}, ${pick(
-        heroMoments
-      )}. Ekspresi polos dan tulus, gerakan natural, hangat, realistis. Durasi 12–15 detik. Akhiri dengan senyum kecil atau anggukan.`;
+      return `${base} Lalu Sweepy ${pick(heroMoments)} dengan ekspresi polos dan tulus. Single scene, 6 detik, natural, realistis.`;
     }
-
     if (mode === 'horror') {
-      return `@mockey.mo (Sweepy) di ${pick(places)}, sedang ${pick(
-        dailyActions
-      )}. Ada momen horor ringan: ${pick(horrorLight)}. Jangan berlebihan, tetap aman dan lucu tipis di ending (Sweepy lega atau nyengir). Durasi 12–15 detik.`;
+      return `${base} Ada momen horor ringan: ${pick(
+        horrorLight
+      )}. Ending aman & lucu tipis (Sweepy lega/nyengir). Single scene, 6 detik, natural, realistis.`;
     }
-
     if (mode === 'funny') {
-      return `@mockey.mo (Sweepy) di ${pick(places)}, ${pick(
-        dailyActions
-      )}. Twist lucu: ${pick(funnyTwists)}. Komedi natural, ekspresi jelas, timing pas, tetap realistis. Durasi 12–15 detik.`;
+      return `${base} Twist lucu: ${pick(funnyTwists)}. Komedi natural, timing pas. Single scene, 6 detik, realistis.`;
     }
-
-    // default daily
-    return `@mockey.mo (Sweepy) di ${pick(places)}, ${pick(
-      dailyActions
-    )}. Aktivitas sederhana tanpa konflik besar. Suasana hangat, natural, realistis seperti vlog daily. Durasi 12–15 detik.`;
+    return `${base} Aktivitas sederhana tanpa konflik besar. Vibe hangat seperti vlog daily. Single scene, 6 detik, realistis.`;
   }
 
-  // ✅ @hanz26 UGC generator (relatable + soft selling halus)
-  function makeHanzUGC() {
+  // ✅ @hanz26 UGC generator (1 scene, 6s, Bahasa Indonesia)
+  function makeHanzIdea() {
     const settings = [
-      'di kamar dengan pencahayaan natural dari jendela',
+      'di kamar dengan cahaya natural dari jendela',
       'di kafe minimalis yang tenang',
       'di teras rumah sore hari',
       'di ruang tamu rapi dengan ambience hangat',
       'di depan cermin, gaya get-ready-with-me',
+    ];
+
+    const hooks = [
+      '“Gue dulu sering gagal konsisten… sampai gue ubah 1 hal ini.”',
+      '“Kalau kamu ngerasa mager, coba cara ini dulu.”',
+      '“Yang bikin gue rutin itu bukan motivasi… tapi sistem.”',
+      '“Ini tips paling simpel tapi efeknya kerasa.”',
+      '“Boleh jujur? Cara ini enak banget dijalanin.”',
     ];
 
     const topics = [
@@ -131,40 +131,41 @@ export default function Page() {
       'soft selling halus: rekomendasi produk tanpa hard selling',
     ];
 
-    const hooks = [
-      '“Gue dulu sering gagal konsisten… sampai akhirnya gue ubah 1 hal ini.”',
-      '“Kalau kamu ngerasa mager, coba cara ini dulu.”',
-      '“Yang bikin gue bisa rutin itu bukan motivasi… tapi sistem.”',
-      '“Ini tips paling simpel tapi efeknya kerasa.”',
-      '“Boleh jujur? Gue baru nemu cara yang beneran enak dijalanin.”',
-    ];
-
-    return `@hanz26 duduk santai gaya UGC ${pick(settings)}. Buka dengan hook: ${pick(
+    return `@hanz26 gaya UGC ${pick(settings)}. Buka dengan hook: ${pick(
       hooks
     )} Lalu bahas: ${pick(
       topics
-    )}. Bahasa Indonesia, natural, ekspresi ramah, framing smartphone handheld, lighting bagus, vibe relatable. Durasi 12–15 detik.`;
+    )}. Bahasa Indonesia, natural, ramah, framing smartphone handheld. Single scene, 6 detik.`;
+  }
+
+  // ✅ Reference Photo preset (tanpa karakter spesifik, pakai foto upload di Sora)
+  function makeReferenceIdea() {
+    const actions = [
+      'menoleh pelan lalu senyum tipis',
+      'mengangkat cangkir minum sedikit',
+      'menatap kamera sebentar lalu melihat ke samping',
+      'menghela napas pelan, ekspresi tenang',
+      'merapikan kerah baju atau rambut secara natural',
+      'mengangguk kecil seperti setuju/oke',
+    ];
+
+    const settings = [
+      'di ruangan dengan cahaya lembut dari samping',
+      'di kafe tenang dengan ambience hangat',
+      'di teras rumah saat sore',
+      'di ruangan minimalis dengan background bersih',
+      'di luar ruangan saat mendung, lighting soft',
+    ];
+
+    return `Use the uploaded reference photo as the character identity (match face, outfit, hairstyle). Single scene, 6 seconds. Setting: ${pick(
+      settings
+    )}. Action: ${pick(actions)}. Keep motion minimal and realistic. No redesign, no outfit change, no scene change, no text overlay.`;
   }
 
   function makeAutoIdea() {
-    if (preset === 'sweepy') return makeSweepyDaily();
-    return makeHanzUGC();
-  }
-
-  // ✅ Open Sora App (Android Intent) + fallback ke web
-  function openSoraAuto() {
-    const intentUrl =
-      'intent://open#Intent;' + 'scheme=sora;' + 'package=com.openai.sora;' + 'end';
-    const webFallback = 'https://sora.openai.com';
-    const start = Date.now();
-
-    window.location.href = intentUrl;
-
-    setTimeout(() => {
-      if (Date.now() - start < 2500) {
-        window.open(webFallback, '_blank', 'noopener,noreferrer');
-      }
-    }, 1200);
+    if (preset === 'sweepy') return makeSweepyIdea();
+    if (preset === 'hanz26') return makeHanzIdea();
+    return makeReferenceIdea();
   }
 
   async function generateWithText(text: string) {
@@ -184,6 +185,7 @@ export default function Page() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // kirim preset (opsional, backend boleh ignore)
         body: JSON.stringify({ prompt: p, preset }),
       });
 
@@ -239,24 +241,9 @@ export default function Page() {
     }
   }
 
-  // ✅ Copy final prompt lalu coba buka Sora
-  async function onCopyAndOpen() {
-    if (!finalPrompt) return;
-    try {
-      await navigator.clipboard.writeText(finalPrompt);
-      setCopiedFinal(true);
-      setTimeout(() => setCopiedFinal(false), 1200);
-    } catch {
-      // tetap lanjut open
-    }
-    // kasih jeda kecil supaya clipboard selesai
-    setTimeout(() => openSoraAuto(), 250);
-  }
-
   function onClear() {
     setPrompt('');
     setErr('');
-    setResult(null);
   }
 
   const S = styles;
@@ -272,14 +259,14 @@ export default function Page() {
             <div style={S.logoDot} />
             <div>
               <h1 style={S.title}>SORA LITE</h1>
-              <p style={S.subtitle}>Personal AI Video Practice</p>
+              <p style={S.subtitle}>Prompt Builder (6s default)</p>
             </div>
           </div>
 
           <div style={S.badgeRow}>
             <span style={S.badge}>Mobile-first</span>
-            <span style={S.badge}>Preset Character</span>
-            <span style={S.badge}>Copy-to-Sora</span>
+            <span style={S.badge}>Auto-generate</span>
+            <span style={S.badge}>Copy Final Prompt</span>
           </div>
         </header>
 
@@ -289,7 +276,14 @@ export default function Page() {
             <div>
               <div style={S.cardTitle}>Prompt</div>
               <div style={S.cardHint}>
-                Pilih preset karakter, lalu tulis ide singkat. Atau tekan <b>Auto-generate</b> untuk buat ide baru dan langsung generate finalPrompt.
+                Pilih preset karakter, lalu tulis ide singkat. Atau tekan <b>Auto-generate</b> untuk buat ide baru dan langsung generate final prompt.
+                <div style={{ marginTop: 6, opacity: 0.9 }}>
+                  {preset === 'reference' ? (
+                    <span>
+                      🖼️ <b>Reference Photo:</b> Upload foto referensi di Sora terlebih dulu, lalu paste final prompt.
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </div>
 
@@ -306,7 +300,7 @@ export default function Page() {
 
           {/* Preset toggle */}
           <div style={S.presetRow}>
-            {(['sweepy', 'hanz26'] as PresetKey[]).map((k) => {
+            {(['sweepy', 'hanz26', 'reference'] as PresetKey[]).map((k) => {
               const active = preset === k;
               return (
                 <button
@@ -344,16 +338,16 @@ export default function Page() {
           <div style={S.miniRow}>
             <div style={S.miniLeft}>
               <div style={S.miniText}>
-                Preset aktif:{' '}
-                <span style={S.miniStrong}>
-                  {presetLabel[preset].title} ({presetLabel[preset].sub})
-                </span>
+                Preset aktif: <span style={S.miniStrong}>{presetLabel[preset].title} ({presetLabel[preset].sub})</span>
+              </div>
+              <div style={S.miniText}>
+                Default durasi: <span style={S.miniStrong}>6 detik</span> (single scene)
               </div>
             </div>
 
             <div style={S.miniRight}>
               <span style={S.charCount}>{prompt.length} chars</span>
-              <button type="button" onClick={onClear} disabled={loading && prompt.length === 0} style={S.linkBtn}>
+              <button type="button" onClick={onClear} disabled={loading || prompt.length === 0} style={S.linkBtn}>
                 Clear
               </button>
             </div>
@@ -370,7 +364,7 @@ export default function Page() {
                 cursor: canSubmit ? 'pointer' : 'not-allowed',
               }}
             >
-              {loading ? 'Generating…' : 'Generate (Demo)'}
+              {loading ? 'Generating…' : 'Generate (Builder)'}
             </button>
 
             <div style={S.metaRight}>
@@ -389,52 +383,28 @@ export default function Page() {
         <section style={S.card} ref={finalRef}>
           <div style={S.cardHead}>
             <div>
-              <div style={S.cardTitle}>Final Prompt (Copy ke Sora)</div>
-              <div style={S.cardHint}>
-                Ini teks prompt final yang tinggal kamu paste ke Sora. (Bukan JSON.)
-              </div>
+              <div style={S.cardTitle}>Final Prompt (Paste ke Sora)</div>
+              <div style={S.cardHint}>Ini teks final prompt yang tinggal kamu paste ke Sora / tool video lain.</div>
             </div>
-          </div>
 
-          <div style={S.resultBox}>
-            {!finalPrompt && !loading ? (
-              <div style={S.emptyState}>Belum ada hasil. Tekan Generate atau Auto-generate.</div>
-            ) : null}
-            {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
-            {finalPrompt ? <pre style={S.pre}>{finalPrompt}</pre> : null}
-          </div>
-
-          <div style={S.finalActions}>
             <button
               type="button"
               onClick={onCopyFinal}
               disabled={!finalPrompt}
               style={{
-                ...S.secondaryBtn,
-                opacity: finalPrompt ? 1 : 0.55,
+                ...S.smallBtn,
+                opacity: finalPrompt ? 1 : 0.5,
                 cursor: finalPrompt ? 'pointer' : 'not-allowed',
               }}
             >
               {copiedFinal ? 'Copied ✅' : 'Copy Final Prompt'}
             </button>
-
-            <button
-              type="button"
-              onClick={onCopyAndOpen}
-              disabled={!finalPrompt}
-              style={{
-                ...S.finalPrimaryBtn,
-                opacity: finalPrompt ? 1 : 0.55,
-                cursor: finalPrompt ? 'pointer' : 'not-allowed',
-              }}
-            >
-              🚀 Copy & Open Sora
-            </button>
           </div>
 
-          <div style={S.finalHelper}>
-            Catatan: Web tidak bisa memaksa app selalu muncul di depan. Kalau app terbuka di background, buka <b>Recent Apps</b> lalu pilih Sora.
-            Kalau app tidak terbuka, otomatis akan buka versi web.
+          <div style={S.resultBox}>
+            {!finalPrompt && !loading ? <div style={S.emptyState}>Belum ada hasil. Tekan Generate atau Auto-generate.</div> : null}
+            {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
+            {finalPrompt ? <pre style={S.pre}>{finalPrompt}</pre> : null}
           </div>
         </section>
 
@@ -443,7 +413,7 @@ export default function Page() {
           <div style={S.cardHead}>
             <div>
               <div style={S.cardTitle}>Response (JSON)</div>
-              <div style={S.cardHint}>Kalau mau edit/inspect storyboard, copy JSON-nya.</div>
+              <div style={S.cardHint}>Kalau mau inspect output, copy JSON-nya.</div>
             </div>
 
             <button
@@ -503,7 +473,7 @@ const styles: Record<string, React.CSSProperties> = {
     pointerEvents: 'none',
   },
   container: {
-    maxWidth: 860,
+    maxWidth: 900,
     margin: '0 auto',
     position: 'relative',
   },
@@ -528,7 +498,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 34,
     letterSpacing: 1.2,
     lineHeight: 1.05,
-    fontWeight: 800,
+    fontWeight: 900,
   },
   subtitle: {
     margin: '6px 0 0',
@@ -568,18 +538,18 @@ const styles: Record<string, React.CSSProperties> = {
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: 800,
+    fontWeight: 900,
     marginBottom: 4,
   },
   cardHint: {
     fontSize: 12,
     opacity: 0.72,
     lineHeight: 1.35,
-    maxWidth: 560,
+    maxWidth: 620,
   },
   presetRow: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    gridTemplateColumns: 'repeat(3, 1fr)',
     gap: 10,
     marginBottom: 12,
   },
@@ -638,14 +608,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   miniLeft: { flex: 1 },
   miniRight: { display: 'flex', alignItems: 'center', gap: 10 },
-  miniText: { fontSize: 12, opacity: 0.78 },
-  miniStrong: { fontWeight: 800, opacity: 1 },
+  miniText: { fontSize: 12, opacity: 0.78, marginTop: 2 },
+  miniStrong: { fontWeight: 900, opacity: 1 },
   charCount: { fontSize: 12, opacity: 0.78 },
   linkBtn: {
     background: 'transparent',
     border: 'none',
     color: 'rgba(76,245,219,0.95)',
-    fontWeight: 800,
+    fontWeight: 900,
     cursor: 'pointer',
     padding: 6,
   },
@@ -678,41 +648,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 900,
     fontSize: 13,
     whiteSpace: 'nowrap',
-  },
-  secondaryBtn: {
-    padding: '12px 14px',
-    borderRadius: 14,
-    border: '1px solid rgba(255,255,255,0.12)',
-    background: 'rgba(255,255,255,0.06)',
-    color: 'rgba(255,255,255,0.92)',
-    fontWeight: 900,
-    letterSpacing: 0.2,
-    width: '100%',
-    maxWidth: 260,
-  },
-  finalPrimaryBtn: {
-    padding: '12px 14px',
-    borderRadius: 14,
-    border: '1px solid rgba(255,255,255,0.12)',
-    background: 'linear-gradient(90deg, rgba(76,245,219,0.45), rgba(106,169,255,0.32))',
-    color: 'rgba(255,255,255,0.92)',
-    fontWeight: 900,
-    letterSpacing: 0.2,
-    width: '100%',
-    maxWidth: 360,
-    boxShadow: '0 10px 24px rgba(0,0,0,0.25)',
-  },
-  finalActions: {
-    display: 'flex',
-    gap: 12,
-    marginTop: 12,
-    flexWrap: 'wrap',
-  },
-  finalHelper: {
-    marginTop: 10,
-    fontSize: 12,
-    opacity: 0.75,
-    lineHeight: 1.35,
   },
   metaRight: {
     flex: 1,
