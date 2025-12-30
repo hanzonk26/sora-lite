@@ -15,9 +15,6 @@ export default function Page() {
 
   const finalRef = useRef<HTMLDivElement | null>(null);
 
-  // --- UI version badge (biar gampang ngecek deploy beneran berubah)
-  const UI_VERSION = 'UI v7';
-
   const presetLabel: Record<PresetKey, { title: string; sub: string; emoji: string }> = {
     sweepy: { title: 'Sweepy', sub: '@mockey.mo', emoji: '🐵' },
     hanz26: { title: '@hanz26', sub: 'AI version', emoji: '🧑' },
@@ -38,89 +35,120 @@ export default function Page() {
     return result?.output?.finalPrompt ? String(result.output.finalPrompt) : '';
   }, [result]);
 
-  // --- Random idea generator (tanpa "contoh" statis)
   function pick<T>(arr: T[]) {
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
-  function generateIdea(p: PresetKey) {
-    if (p === 'sweepy') {
-      const places = [
-        'di ruang tamu malam hari',
-        'di kamar dengan lampu temaram',
-        'di kosan kecil, suasana hujan di luar',
-        'di warung kopi sepi, TV tua menyala',
-        'di ruang keluarga, hanya cahaya TV',
-      ];
-      const movies = [
-        'film horor klasik',
-        'film horor viral',
-        'tayangan misteri tengah malam',
-        'film tentang rumah angker',
-        'film bertema ritual menyeramkan',
-      ];
-      const tvEvents = [
-        'sosok di layar TV makin mendekat ke kaca',
-        'bayangan di TV bergerak tidak sinkron dengan filmnya',
-        'tangan dari dalam layar hampir menyentuh luar',
-        'wajah menyeramkan tiba-tiba memenuhi layar',
-        'suara “krsss…” TV berubah jadi bisikan',
-      ];
-      const punch = [
-        'Sweepy mengetuk TV pakai remote dan sosoknya mundur panik',
-        'Sweepy pencet tombol “mute” dan sosoknya langsung kehilangan tenaga',
-        'Sweepy lempar bantal ke TV, sosoknya kaget dan hilang',
-        'Sweepy nunjuk tulisan “STOP” (tanpa teks overlay), sosoknya langsung patuh mundur',
-        'Sweepy nyalain lampu—ternyata sosoknya cuma pantulan, Sweepy ketawa',
-      ];
-      const style = [
-        'cinematic horror tapi lucu',
-        'horor tegang dengan punchline komedi',
-        'suspense gelap namun ending kocak',
-      ];
+  // ✅ Sweepy daily generator (mix daily/funny/hero/horror ringan)
+  function makeSweepyDaily() {
+    const places = [
+      'warung kopi sepi',
+      'teras rumah sore hari',
+      'kamar kos sederhana',
+      'pinggir jalan kecil',
+      'ruang tamu dengan TV tua',
+      'halaman belakang rumah',
+      'taman kecil dekat rumah',
+      'dapur sederhana malam hari',
+    ];
 
-      return `@mockey.mo (Sweepy) ${pick(places)} sedang nonton ${pick(
-        movies
-      )}. Lalu ${pick(tvEvents)}. Twist: ${pick(punch)}. Gaya: ${pick(style)}, ekspresi jelas, timing natural.`;
+    const dailyActions = [
+      'duduk santai sambil ngopi',
+      'rebahan sambil main HP',
+      'menyapu halaman dengan gerakan malas tapi lucu',
+      'makan mie instan dengan ekspresi super serius',
+      'nonton TV sambil ngemil pelan',
+      'membersihkan meja kecil dengan teliti',
+      'pilih playlist musik lalu ikut goyang tipis',
+      'ngatur barang-barang berantakan jadi rapi',
+    ];
+
+    const funnyTwists = [
+      'gelas kopinya hampir jatuh lalu diselamatkan dengan ekspresi panik',
+      'Sweepy sadar kamera lalu langsung sok cool',
+      'Sweepy bengong lama lalu baru sadar ada suara notifikasi',
+      'Sweepy kaget suara kecil lalu cek sekeliling dengan gaya dramatis',
+      'Sweepy refleks melakukan hal konyol tanpa sadar lalu malu sendiri',
+      'Sweepy salah ambil remote, malah pencet tombol yang bikin TV mute lalu nyari-nyari',
+    ];
+
+    const heroMoments = [
+      'membantu anak kucing kecil menyeberang pelan-pelan',
+      'memungut sampah plastik dan membuangnya ke tempat sampah',
+      'membereskan barang yang hampir jatuh dari meja',
+      'menolong hewan kecil yang terlihat kebingungan mencari jalan',
+      'membantu orang tua membawa barang ringan dengan sopan',
+    ];
+
+    const horrorLight = [
+      'bayangan aneh muncul sebentar lalu hilang (ternyata pantulan)',
+      'suara TV berubah statis beberapa detik lalu normal lagi',
+      'pintu berderit pelan, Sweepy menoleh… ternyata angin',
+      'pantulan kaca terlihat aneh, tapi cuma efek cahaya',
+    ];
+
+    const mode = pick(['daily', 'funny', 'hero', 'horror'] as const);
+
+    if (mode === 'hero') {
+      return `@mockey.mo (Sweepy) berada di ${pick(places)}, ${pick(
+        heroMoments
+      )}. Ekspresi polos dan tulus, gerakan natural, hangat, realistis. Durasi 12–15 detik. Akhiri dengan senyum kecil atau anggukan.`;
     }
 
-    // hanz26 (UGC, santai, niche kesehatan bisa)
+    if (mode === 'horror') {
+      return `@mockey.mo (Sweepy) di ${pick(places)}, sedang ${pick(
+        dailyActions
+      )}. Ada momen horor ringan: ${pick(horrorLight)}. Jangan berlebihan, tetap aman dan lucu tipis di ending (Sweepy lega atau nyengir). Durasi 12–15 detik.`;
+    }
+
+    if (mode === 'funny') {
+      return `@mockey.mo (Sweepy) di ${pick(places)}, ${pick(
+        dailyActions
+      )}. Twist lucu: ${pick(funnyTwists)}. Komedi natural, ekspresi jelas, timing pas, tetap realistis. Durasi 12–15 detik.`;
+    }
+
+    // default daily
+    return `@mockey.mo (Sweepy) di ${pick(places)}, ${pick(
+      dailyActions
+    )}. Aktivitas sederhana tanpa konflik besar. Suasana hangat, natural, realistis seperti vlog daily. Durasi 12–15 detik.`;
+  }
+
+  // ✅ @hanz26 UGC generator (relatable + soft selling halus)
+  function makeHanzUGC() {
     const settings = [
-      'duduk santai di sofa',
-      'di meja kafe minimalis',
-      'di teras rumah pagi hari',
-      'di kamar dengan lighting soft',
-      'di pinggir jendela saat hujan gerimis',
-    ];
-    const hooks = [
-      'buka dengan kalimat singkat yang relatable',
-      'mulai dengan ekspresi “eh gue baru sadar…”',
-      'awal video seperti ngobrol ke teman dekat',
-      'awal dengan “gue mau share tips simpel…”',
-    ];
-    const topics = [
-      'tips kebiasaan sehat 30 detik',
-      'rutinitas minum air yang gampang diikutin',
-      'cara pilih snack lebih aman tanpa ribet',
-      'habit kecil biar badan lebih enteng',
-      '1 kesalahan umum setelah makan besar',
-    ];
-    const actions = [
-      'gesture tangan natural, eye contact ke kamera',
-      'senyum tipis, intonasi santai',
-      'tunjuk botol minum / gelas sebagai properti',
-      'ambil napas kecil lalu lanjut ngomong',
-    ];
-    const softSell = [
-      'sebut “kalau mau, link ada di bio” tanpa hard selling',
-      'soft mention produk/alat pendukung sebagai opsi',
-      'tutup dengan CTA halus: “kalau pengen versi lengkap, komen ya”',
-      'penutup: “gue taruh detailnya di caption”',
+      'di kamar dengan pencahayaan natural dari jendela',
+      'di kafe minimalis yang tenang',
+      'di teras rumah sore hari',
+      'di ruang tamu rapi dengan ambience hangat',
+      'di depan cermin, gaya get-ready-with-me',
     ];
 
-    return `@hanz26 ${pick(settings)} gaya UGC. ${pick(hooks)} tentang ${pick(
+    const topics = [
+      'tips singkat biar tetap konsisten hidup sehat',
+      'rutinitas pagi sederhana yang bikin mood naik',
+      '3 kebiasaan kecil yang bantu badan lebih fit',
+      'cerita singkat pengalaman pribadi yang relatable',
+      'soft selling halus: rekomendasi produk tanpa hard selling',
+    ];
+
+    const hooks = [
+      '“Gue dulu sering gagal konsisten… sampai akhirnya gue ubah 1 hal ini.”',
+      '“Kalau kamu ngerasa mager, coba cara ini dulu.”',
+      '“Yang bikin gue bisa rutin itu bukan motivasi… tapi sistem.”',
+      '“Ini tips paling simpel tapi efeknya kerasa.”',
+      '“Boleh jujur? Gue baru nemu cara yang beneran enak dijalanin.”',
+    ];
+
+    return `@hanz26 duduk santai gaya UGC ${pick(settings)}. Buka dengan hook: ${pick(
+      hooks
+    )} Lalu bahas: ${pick(
       topics
-    )}. ${pick(actions)}. Ending ${pick(softSell)}. Vibe relatable, natural, cinematic lighting ringan.`;
+    )}. Bahasa Indonesia, natural, ekspresi ramah, framing smartphone handheld, lighting bagus, vibe relatable. Durasi 12–15 detik.`;
+  }
+
+  function makeAutoIdea() {
+    if (preset === 'sweepy') return makeSweepyDaily();
+    return makeHanzUGC();
   }
 
   async function generateWithText(text: string) {
@@ -146,10 +174,7 @@ export default function Page() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const msg =
-          data?.error ||
-          data?.message ||
-          `Request gagal (HTTP ${res.status}). Cek logs Vercel.`;
+        const msg = data?.error || data?.message || `Request gagal (HTTP ${res.status}).`;
         throw new Error(msg);
       }
 
@@ -169,6 +194,13 @@ export default function Page() {
     await generateWithText(prompt);
   }
 
+  async function onAutoGenerate() {
+    const idea = makeAutoIdea();
+    setPrompt(idea);
+    setErr('');
+    await generateWithText(idea);
+  }
+
   async function onCopyJson() {
     if (!prettyResult) return;
     try {
@@ -176,7 +208,7 @@ export default function Page() {
       setCopiedJson(true);
       setTimeout(() => setCopiedJson(false), 1200);
     } catch {
-      // ignore
+      // no-op
     }
   }
 
@@ -187,15 +219,8 @@ export default function Page() {
       setCopiedFinal(true);
       setTimeout(() => setCopiedFinal(false), 1200);
     } catch {
-      // ignore
+      // no-op
     }
-  }
-
-  function onAutoGenerate() {
-    const idea = generateIdea(preset);
-    setPrompt(idea);
-    setErr('');
-    generateWithText(idea); // auto generate finalPrompt
   }
 
   function onClear() {
@@ -209,10 +234,8 @@ export default function Page() {
     <div style={S.page}>
       <div style={S.bgGlow} />
 
-      {/* version badge */}
-      <div style={S.versionBadge}>{UI_VERSION}</div>
-
       <main style={S.container}>
+        {/* Header */}
         <header style={S.header}>
           <div style={S.brandRow}>
             <div style={S.logoDot} />
@@ -244,7 +267,7 @@ export default function Page() {
               style={{ ...S.smallBtn, opacity: loading ? 0.6 : 1 }}
               onClick={onAutoGenerate}
               disabled={loading}
-              title="Buat ide random + generate otomatis"
+              title="Buat ide baru + generate otomatis"
             >
               {loading ? 'Generating…' : 'Auto-generate'}
             </button>
@@ -290,7 +313,7 @@ export default function Page() {
           <div style={S.miniRow}>
             <div style={S.miniLeft}>
               <div style={S.miniText}>
-                Preset aktif: <span style={S.miniStrong}>{preset === 'sweepy' ? 'Sweepy (@mockey.mo)' : '@hanz26 (AI version)'}</span>
+                Preset aktif: <span style={S.miniStrong}>{presetLabel[preset].title} ({presetLabel[preset].sub})</span>
               </div>
             </div>
 
@@ -392,7 +415,7 @@ export default function Page() {
           </div>
 
           <div style={S.footerNote}>
-            Tips: buka <code style={S.code}>/api/generate</code> (GET) untuk cek endpoint hidup.
+            Tips: untuk test endpoint, buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup. Generate beneran pakai POST dari tombol.
           </div>
         </section>
 
@@ -420,18 +443,6 @@ const styles: Record<string, React.CSSProperties> = {
       'radial-gradient(600px 280px at 20% 10%, rgba(70,255,220,0.12), transparent 60%), radial-gradient(500px 240px at 85% 20%, rgba(90,140,255,0.10), transparent 55%)',
     filter: 'blur(6px)',
     pointerEvents: 'none',
-  },
-  versionBadge: {
-    position: 'fixed',
-    top: 10,
-    right: 10,
-    zIndex: 50,
-    fontSize: 12,
-    padding: '6px 10px',
-    borderRadius: 999,
-    background: 'rgba(0,0,0,0.35)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    opacity: 0.75,
   },
   container: {
     maxWidth: 860,
