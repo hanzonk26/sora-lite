@@ -223,6 +223,10 @@ export default function Page() {
     }
   }
 
+  function onOpenSoraWeb() {
+    window.open('https://sora.openai.com', '_blank', 'noopener,noreferrer');
+  }
+
   function onClear() {
     setPrompt('');
     setErr('');
@@ -313,7 +317,10 @@ export default function Page() {
           <div style={S.miniRow}>
             <div style={S.miniLeft}>
               <div style={S.miniText}>
-                Preset aktif: <span style={S.miniStrong}>{presetLabel[preset].title} ({presetLabel[preset].sub})</span>
+                Preset aktif:{' '}
+                <span style={S.miniStrong}>
+                  {presetLabel[preset].title} ({presetLabel[preset].sub})
+                </span>
               </div>
             </div>
 
@@ -354,27 +361,41 @@ export default function Page() {
         {/* Card: Final Prompt */}
         <section style={S.card} ref={finalRef}>
           <div style={S.cardHead}>
-            <div>
+            <div style={{ flex: 1 }}>
               <div style={S.cardTitle}>Final Prompt (Copy ke Sora)</div>
-              <div style={S.cardHint}>Ini teks prompt final yang tinggal kamu paste ke Sora. (Bukan JSON.)</div>
-            </div>
+              <div style={S.cardHint}>
+                Copy prompt ini, lalu buka Sora Web dan paste untuk generate. (Tanpa API video.)
+              </div>
 
-            <button
-              type="button"
-              onClick={onCopyFinal}
-              disabled={!finalPrompt}
-              style={{
-                ...S.smallBtn,
-                opacity: finalPrompt ? 1 : 0.5,
-                cursor: finalPrompt ? 'pointer' : 'not-allowed',
-              }}
-            >
-              {copiedFinal ? 'Copied ✅' : 'Copy Final Prompt'}
-            </button>
+              <div style={S.finalActionsRow}>
+                <button
+                  type="button"
+                  onClick={onCopyFinal}
+                  disabled={!finalPrompt}
+                  style={{
+                    ...S.finalPrimaryBtn,
+                    opacity: finalPrompt ? 1 : 0.55,
+                    cursor: finalPrompt ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  {copiedFinal ? 'Copied ✅' : '📋 Copy Final Prompt'}
+                </button>
+
+                <button type="button" onClick={onOpenSoraWeb} style={S.finalSecondaryBtn} title="Buka Sora Web di tab baru">
+                  🚀 Open Sora Web
+                </button>
+              </div>
+
+              <div style={S.finalHelper}>
+                Tips: Setelah kebuka, paste prompt di Sora Web lalu klik Generate.
+              </div>
+            </div>
           </div>
 
           <div style={S.resultBox}>
-            {!finalPrompt && !loading ? <div style={S.emptyState}>Belum ada hasil. Tekan Generate atau Auto-generate.</div> : null}
+            {!finalPrompt && !loading ? (
+              <div style={S.emptyState}>Belum ada hasil. Tekan Generate atau Auto-generate.</div>
+            ) : null}
             {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
             {finalPrompt ? <pre style={S.pre}>{finalPrompt}</pre> : null}
           </div>
@@ -621,6 +642,42 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     whiteSpace: 'nowrap',
   },
+
+  // ✅ Final Prompt UX (Copy + Open Sora)
+  finalActionsRow: {
+    marginTop: 10,
+    display: 'flex',
+    gap: 10,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  finalPrimaryBtn: {
+    padding: '10px 14px',
+    borderRadius: 14,
+    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'linear-gradient(90deg, rgba(76,245,219,0.35), rgba(106,169,255,0.25))',
+    color: 'rgba(255,255,255,0.92)',
+    fontWeight: 900,
+    letterSpacing: 0.2,
+    boxShadow: '0 10px 24px rgba(0,0,0,0.25)',
+  },
+  finalSecondaryBtn: {
+    padding: '10px 14px',
+    borderRadius: 999,
+    border: '1px solid rgba(255,255,255,0.14)',
+    background: 'rgba(255,255,255,0.06)',
+    color: 'rgba(255,255,255,0.92)',
+    fontWeight: 900,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+  finalHelper: {
+    marginTop: 8,
+    fontSize: 12,
+    opacity: 0.75,
+    lineHeight: 1.4,
+  },
+
   metaRight: {
     flex: 1,
     minWidth: 220,
