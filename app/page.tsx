@@ -151,6 +151,22 @@ export default function Page() {
     return makeHanzUGC();
   }
 
+  // ✅ Open Sora App (Android Intent) + fallback ke web
+  function openSoraAuto() {
+    const intentUrl =
+      'intent://open#Intent;' + 'scheme=sora;' + 'package=com.openai.sora;' + 'end';
+    const webFallback = 'https://sora.openai.com';
+    const start = Date.now();
+
+    window.location.href = intentUrl;
+
+    setTimeout(() => {
+      if (Date.now() - start < 2500) {
+        window.open(webFallback, '_blank', 'noopener,noreferrer');
+      }
+    }, 1200);
+  }
+
   async function generateWithText(text: string) {
     const p = text.trim();
     if (!p) {
@@ -223,13 +239,24 @@ export default function Page() {
     }
   }
 
-  function onOpenSoraWeb() {
-    window.open('https://sora.openai.com', '_blank', 'noopener,noreferrer');
+  // ✅ Copy final prompt lalu coba buka Sora
+  async function onCopyAndOpen() {
+    if (!finalPrompt) return;
+    try {
+      await navigator.clipboard.writeText(finalPrompt);
+      setCopiedFinal(true);
+      setTimeout(() => setCopiedFinal(false), 1200);
+    } catch {
+      // tetap lanjut open
+    }
+    // kasih jeda kecil supaya clipboard selesai
+    setTimeout(() => openSoraAuto(), 250);
   }
 
   function onClear() {
     setPrompt('');
     setErr('');
+    setResult(null);
   }
 
   const S = styles;
@@ -326,7 +353,7 @@ export default function Page() {
 
             <div style={S.miniRight}>
               <span style={S.charCount}>{prompt.length} chars</span>
-              <button type="button" onClick={onClear} disabled={loading || prompt.length === 0} style={S.linkBtn}>
+              <button type="button" onClick={onClear} disabled={loading && prompt.length === 0} style={S.linkBtn}>
                 Clear
               </button>
             </div>
@@ -343,7 +370,7 @@ export default function Page() {
                 cursor: canSubmit ? 'pointer' : 'not-allowed',
               }}
             >
-              {loading ? 'Generating…' : 'Generate Video (Demo)'}
+              {loading ? 'Generating…' : 'Generate (Demo)'}
             </button>
 
             <div style={S.metaRight}>
@@ -361,33 +388,10 @@ export default function Page() {
         {/* Card: Final Prompt */}
         <section style={S.card} ref={finalRef}>
           <div style={S.cardHead}>
-            <div style={{ flex: 1 }}>
+            <div>
               <div style={S.cardTitle}>Final Prompt (Copy ke Sora)</div>
               <div style={S.cardHint}>
-                Copy prompt ini, lalu buka Sora Web dan paste untuk generate. (Tanpa API video.)
-              </div>
-
-              <div style={S.finalActionsRow}>
-                <button
-                  type="button"
-                  onClick={onCopyFinal}
-                  disabled={!finalPrompt}
-                  style={{
-                    ...S.finalPrimaryBtn,
-                    opacity: finalPrompt ? 1 : 0.55,
-                    cursor: finalPrompt ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  {copiedFinal ? 'Copied ✅' : '📋 Copy Final Prompt'}
-                </button>
-
-                <button type="button" onClick={onOpenSoraWeb} style={S.finalSecondaryBtn} title="Buka Sora Web di tab baru">
-                  🚀 Open Sora Web
-                </button>
-              </div>
-
-              <div style={S.finalHelper}>
-                Tips: Setelah kebuka, paste prompt di Sora Web lalu klik Generate.
+                Ini teks prompt final yang tinggal kamu paste ke Sora. (Bukan JSON.)
               </div>
             </div>
           </div>
@@ -398,6 +402,39 @@ export default function Page() {
             ) : null}
             {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
             {finalPrompt ? <pre style={S.pre}>{finalPrompt}</pre> : null}
+          </div>
+
+          <div style={S.finalActions}>
+            <button
+              type="button"
+              onClick={onCopyFinal}
+              disabled={!finalPrompt}
+              style={{
+                ...S.secondaryBtn,
+                opacity: finalPrompt ? 1 : 0.55,
+                cursor: finalPrompt ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {copiedFinal ? 'Copied ✅' : 'Copy Final Prompt'}
+            </button>
+
+            <button
+              type="button"
+              onClick={onCopyAndOpen}
+              disabled={!finalPrompt}
+              style={{
+                ...S.finalPrimaryBtn,
+                opacity: finalPrompt ? 1 : 0.55,
+                cursor: finalPrompt ? 'pointer' : 'not-allowed',
+              }}
+            >
+              🚀 Copy & Open Sora
+            </button>
+          </div>
+
+          <div style={S.finalHelper}>
+            Catatan: Web tidak bisa memaksa app selalu muncul di depan. Kalau app terbuka di background, buka <b>Recent Apps</b> lalu pilih Sora.
+            Kalau app tidak terbuka, otomatis akan buka versi web.
           </div>
         </section>
 
@@ -642,42 +679,41 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     whiteSpace: 'nowrap',
   },
-
-  // ✅ Final Prompt UX (Copy + Open Sora)
-  finalActionsRow: {
-    marginTop: 10,
-    display: 'flex',
-    gap: 10,
-    flexWrap: 'wrap',
-    alignItems: 'center',
-  },
-  finalPrimaryBtn: {
-    padding: '10px 14px',
+  secondaryBtn: {
+    padding: '12px 14px',
     borderRadius: 14,
     border: '1px solid rgba(255,255,255,0.12)',
-    background: 'linear-gradient(90deg, rgba(76,245,219,0.35), rgba(106,169,255,0.25))',
-    color: 'rgba(255,255,255,0.92)',
-    fontWeight: 900,
-    letterSpacing: 0.2,
-    boxShadow: '0 10px 24px rgba(0,0,0,0.25)',
-  },
-  finalSecondaryBtn: {
-    padding: '10px 14px',
-    borderRadius: 999,
-    border: '1px solid rgba(255,255,255,0.14)',
     background: 'rgba(255,255,255,0.06)',
     color: 'rgba(255,255,255,0.92)',
     fontWeight: 900,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
+    letterSpacing: 0.2,
+    width: '100%',
+    maxWidth: 260,
+  },
+  finalPrimaryBtn: {
+    padding: '12px 14px',
+    borderRadius: 14,
+    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'linear-gradient(90deg, rgba(76,245,219,0.45), rgba(106,169,255,0.32))',
+    color: 'rgba(255,255,255,0.92)',
+    fontWeight: 900,
+    letterSpacing: 0.2,
+    width: '100%',
+    maxWidth: 360,
+    boxShadow: '0 10px 24px rgba(0,0,0,0.25)',
+  },
+  finalActions: {
+    display: 'flex',
+    gap: 12,
+    marginTop: 12,
+    flexWrap: 'wrap',
   },
   finalHelper: {
-    marginTop: 8,
+    marginTop: 10,
     fontSize: 12,
     opacity: 0.75,
-    lineHeight: 1.4,
+    lineHeight: 1.35,
   },
-
   metaRight: {
     flex: 1,
     minWidth: 220,
