@@ -15,6 +15,9 @@ export default function Page() {
 
   const finalRef = useRef<HTMLDivElement | null>(null);
 
+  // --- UI version badge (biar gampang ngecek deploy beneran berubah)
+  const UI_VERSION = 'UI v7';
+
   const presetLabel: Record<PresetKey, { title: string; sub: string; emoji: string }> = {
     sweepy: { title: 'Sweepy', sub: '@mockey.mo', emoji: '🐵' },
     hanz26: { title: '@hanz26', sub: 'AI version', emoji: '🧑' },
@@ -35,26 +38,89 @@ export default function Page() {
     return result?.output?.finalPrompt ? String(result.output.finalPrompt) : '';
   }, [result]);
 
-  function generateAutoPrompt(p: PresetKey) {
-    const variantsSweepy = [
-      'Sweepy (@mockey.mo) di ruang tamu malam hari, suasana tegang ringan, ada kejadian aneh tapi lucu, ekspresi jelas, cinematic lighting, gerakan natural, fokus karakter.',
-      'Sweepy (@mockey.mo) jalan pelan di pinggir sungai mencari ikan kecil, tiba-tiba ada suara dari semak, suasana menegangkan tapi berakhir lucu, cinematic, timing jelas.',
-      'Sweepy (@mockey.mo) duduk santai menonton TV, bayangan di layar makin dekat, Sweepy panik lalu melakukan aksi kocak, tetap cinematic, jelas, tidak terlalu rumit.',
-      'Sweepy (@mockey.mo) membersihkan halaman, tiba-tiba ada benda bergerak sendiri, Sweepy kaget lalu bereaksi lucu, shot rapi, lighting dramatis tapi fun.',
+  // --- Random idea generator (tanpa "contoh" statis)
+  function pick<T>(arr: T[]) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function generateIdea(p: PresetKey) {
+    if (p === 'sweepy') {
+      const places = [
+        'di ruang tamu malam hari',
+        'di kamar dengan lampu temaram',
+        'di kosan kecil, suasana hujan di luar',
+        'di warung kopi sepi, TV tua menyala',
+        'di ruang keluarga, hanya cahaya TV',
+      ];
+      const movies = [
+        'film horor klasik',
+        'film horor viral',
+        'tayangan misteri tengah malam',
+        'film tentang rumah angker',
+        'film bertema ritual menyeramkan',
+      ];
+      const tvEvents = [
+        'sosok di layar TV makin mendekat ke kaca',
+        'bayangan di TV bergerak tidak sinkron dengan filmnya',
+        'tangan dari dalam layar hampir menyentuh luar',
+        'wajah menyeramkan tiba-tiba memenuhi layar',
+        'suara “krsss…” TV berubah jadi bisikan',
+      ];
+      const punch = [
+        'Sweepy mengetuk TV pakai remote dan sosoknya mundur panik',
+        'Sweepy pencet tombol “mute” dan sosoknya langsung kehilangan tenaga',
+        'Sweepy lempar bantal ke TV, sosoknya kaget dan hilang',
+        'Sweepy nunjuk tulisan “STOP” (tanpa teks overlay), sosoknya langsung patuh mundur',
+        'Sweepy nyalain lampu—ternyata sosoknya cuma pantulan, Sweepy ketawa',
+      ];
+      const style = [
+        'cinematic horror tapi lucu',
+        'horor tegang dengan punchline komedi',
+        'suspense gelap namun ending kocak',
+      ];
+
+      return `@mockey.mo (Sweepy) ${pick(places)} sedang nonton ${pick(
+        movies
+      )}. Lalu ${pick(tvEvents)}. Twist: ${pick(punch)}. Gaya: ${pick(style)}, ekspresi jelas, timing natural.`;
+    }
+
+    // hanz26 (UGC, santai, niche kesehatan bisa)
+    const settings = [
+      'duduk santai di sofa',
+      'di meja kafe minimalis',
+      'di teras rumah pagi hari',
+      'di kamar dengan lighting soft',
+      'di pinggir jendela saat hujan gerimis',
+    ];
+    const hooks = [
+      'buka dengan kalimat singkat yang relatable',
+      'mulai dengan ekspresi “eh gue baru sadar…”',
+      'awal video seperti ngobrol ke teman dekat',
+      'awal dengan “gue mau share tips simpel…”',
+    ];
+    const topics = [
+      'tips kebiasaan sehat 30 detik',
+      'rutinitas minum air yang gampang diikutin',
+      'cara pilih snack lebih aman tanpa ribet',
+      'habit kecil biar badan lebih enteng',
+      '1 kesalahan umum setelah makan besar',
+    ];
+    const actions = [
+      'gesture tangan natural, eye contact ke kamera',
+      'senyum tipis, intonasi santai',
+      'tunjuk botol minum / gelas sebagai properti',
+      'ambil napas kecil lalu lanjut ngomong',
+    ];
+    const softSell = [
+      'sebut “kalau mau, link ada di bio” tanpa hard selling',
+      'soft mention produk/alat pendukung sebagai opsi',
+      'tutup dengan CTA halus: “kalau pengen versi lengkap, komen ya”',
+      'penutup: “gue taruh detailnya di caption”',
     ];
 
-    const variantsHanz = [
-      '@hanz26 duduk santai seperti UGC creator, berbicara singkat ke kamera dengan ekspresi natural, vibe relatable, pencahayaan lembut, framing sederhana, engaging.',
-      '@hanz26 berdiri di kamar/ruang kerja, mode UGC, cerita singkat 1 topik, delivery natural, eye contact, lighting bagus, tone hangat, soft selling halus.',
-      '@hanz26 di cafe sederhana, UGC feel, ngomong santai 2-3 kalimat, ekspresi jujur, natural lighting, handheld halus, vibe premium tapi tetap casual.',
-      '@hanz26 di luar ruangan sore hari, UGC vlog style, cerita singkat, gesture natural, audio ambience ringan, lighting hangat, close-up singkat lalu medium shot.',
-    ];
-
-    const list = p === 'sweepy' ? variantsSweepy : variantsHanz;
-
-    // random ringan + aman
-    const idx = Math.floor(Math.random() * list.length);
-    return list[idx];
+    return `@hanz26 ${pick(settings)} gaya UGC. ${pick(hooks)} tentang ${pick(
+      topics
+    )}. ${pick(actions)}. Ending ${pick(softSell)}. Vibe relatable, natural, cinematic lighting ringan.`;
   }
 
   async function generateWithText(text: string) {
@@ -110,7 +176,7 @@ export default function Page() {
       setCopiedJson(true);
       setTimeout(() => setCopiedJson(false), 1200);
     } catch {
-      // no-op
+      // ignore
     }
   }
 
@@ -121,16 +187,15 @@ export default function Page() {
       setCopiedFinal(true);
       setTimeout(() => setCopiedFinal(false), 1200);
     } catch {
-      // no-op
+      // ignore
     }
   }
 
   function onAutoGenerate() {
-    if (loading) return;
-    const auto = generateAutoPrompt(preset);
-    setPrompt(auto);
+    const idea = generateIdea(preset);
+    setPrompt(idea);
     setErr('');
-    generateWithText(auto);
+    generateWithText(idea); // auto generate finalPrompt
   }
 
   function onClear() {
@@ -143,6 +208,9 @@ export default function Page() {
   return (
     <div style={S.page}>
       <div style={S.bgGlow} />
+
+      {/* version badge */}
+      <div style={S.versionBadge}>{UI_VERSION}</div>
 
       <main style={S.container}>
         <header style={S.header}>
@@ -167,7 +235,7 @@ export default function Page() {
             <div>
               <div style={S.cardTitle}>Prompt</div>
               <div style={S.cardHint}>
-                Pilih preset karakter, lalu tulis ide singkat. Atau tekan “Pakai contoh” untuk auto-generate ide + langsung generate finalPrompt.
+                Pilih preset karakter, lalu tulis ide singkat. Atau tekan <b>Auto-generate</b> untuk buat ide baru dan langsung generate finalPrompt.
               </div>
             </div>
 
@@ -176,9 +244,9 @@ export default function Page() {
               style={{ ...S.smallBtn, opacity: loading ? 0.6 : 1 }}
               onClick={onAutoGenerate}
               disabled={loading}
-              title="Auto generate prompt + generate otomatis"
+              title="Buat ide random + generate otomatis"
             >
-              {loading ? 'Generating…' : 'Pakai contoh'}
+              {loading ? 'Generating…' : 'Auto-generate'}
             </button>
           </div>
 
@@ -196,7 +264,6 @@ export default function Page() {
                     ...S.presetBtn,
                     ...(active ? S.presetBtnActive : null),
                     opacity: loading ? 0.75 : 1,
-                    cursor: loading ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <div style={S.presetTop}>
@@ -216,32 +283,20 @@ export default function Page() {
               setPrompt(e.target.value);
               if (err) setErr('');
             }}
-            placeholder="Tulis ide singkat… atau tekan “Pakai contoh” untuk auto-generate."
+            placeholder="Tulis ide singkat… atau tekan Auto-generate."
             rows={7}
           />
 
           <div style={S.miniRow}>
             <div style={S.miniLeft}>
               <div style={S.miniText}>
-                Preset aktif:{' '}
-                <span style={S.miniStrong}>
-                  {preset === 'sweepy' ? 'Sweepy (@mockey.mo)' : '@hanz26 (AI version)'}
-                </span>
+                Preset aktif: <span style={S.miniStrong}>{preset === 'sweepy' ? 'Sweepy (@mockey.mo)' : '@hanz26 (AI version)'}</span>
               </div>
             </div>
 
             <div style={S.miniRight}>
               <span style={S.charCount}>{prompt.length} chars</span>
-              <button
-                type="button"
-                onClick={onClear}
-                disabled={loading || prompt.length === 0}
-                style={{
-                  ...S.linkBtn,
-                  opacity: loading || prompt.length === 0 ? 0.5 : 1,
-                  cursor: loading || prompt.length === 0 ? 'not-allowed' : 'pointer',
-                }}
-              >
+              <button type="button" onClick={onClear} disabled={loading || prompt.length === 0} style={S.linkBtn}>
                 Clear
               </button>
             </div>
@@ -296,7 +351,7 @@ export default function Page() {
           </div>
 
           <div style={S.resultBox}>
-            {!finalPrompt && !loading ? <div style={S.emptyState}>Belum ada hasil. Tekan Generate atau “Pakai contoh”.</div> : null}
+            {!finalPrompt && !loading ? <div style={S.emptyState}>Belum ada hasil. Tekan Generate atau Auto-generate.</div> : null}
             {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
             {finalPrompt ? <pre style={S.pre}>{finalPrompt}</pre> : null}
           </div>
@@ -307,7 +362,7 @@ export default function Page() {
           <div style={S.cardHead}>
             <div>
               <div style={S.cardTitle}>Response (JSON)</div>
-              <div style={S.cardHint}>Kalau mau inspect storyboard, copy JSON-nya.</div>
+              <div style={S.cardHint}>Kalau mau edit/inspect storyboard, copy JSON-nya.</div>
             </div>
 
             <button
@@ -337,7 +392,7 @@ export default function Page() {
           </div>
 
           <div style={S.footerNote}>
-            Tips: untuk test endpoint di browser, buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup. Generate beneran pakai POST.
+            Tips: buka <code style={S.code}>/api/generate</code> (GET) untuk cek endpoint hidup.
           </div>
         </section>
 
@@ -365,6 +420,18 @@ const styles: Record<string, React.CSSProperties> = {
       'radial-gradient(600px 280px at 20% 10%, rgba(70,255,220,0.12), transparent 60%), radial-gradient(500px 240px at 85% 20%, rgba(90,140,255,0.10), transparent 55%)',
     filter: 'blur(6px)',
     pointerEvents: 'none',
+  },
+  versionBadge: {
+    position: 'fixed',
+    top: 10,
+    right: 10,
+    zIndex: 50,
+    fontSize: 12,
+    padding: '6px 10px',
+    borderRadius: 999,
+    background: 'rgba(0,0,0,0.35)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    opacity: 0.75,
   },
   container: {
     maxWidth: 860,
@@ -510,6 +577,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     color: 'rgba(76,245,219,0.95)',
     fontWeight: 800,
+    cursor: 'pointer',
     padding: 6,
   },
   actionsRow: {
