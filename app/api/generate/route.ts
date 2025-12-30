@@ -74,7 +74,7 @@ function buildStoryboard(userPrompt: string) {
 
     return {
       scene: n,
-      durationSec: 3,
+      durationSec: 10,
       action: beat,
       camera,
       lighting,
