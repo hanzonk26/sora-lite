@@ -9,11 +9,11 @@ export default function Page() {
   const [prompt, setPrompt] = useState('');
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
+  const [err, setErr] = useState<string>('');
   const [copiedJson, setCopiedJson] = useState(false);
   const [copiedFinal, setCopiedFinal] = useState(false);
 
-  const finalRef = useRef<HTMLDivElement | null>(null);
+  const finalSectionRef = useRef<HTMLDivElement | null>(null);
 
   const exampleByPreset: Record<PresetKey, string> = {
     sweepy:
@@ -22,9 +22,9 @@ export default function Page() {
       '@hanz26 duduk santai seperti UGC, cerita singkat dengan ekspresi natural, vibe relatable, lighting bagus, soft selling halus',
   };
 
-  const presetLabel: Record<PresetKey, { title: string; sub: string; emoji: string }> = {
-    sweepy: { title: 'Sweepy', sub: '@mockey.mo', emoji: '🐵' },
-    hanz26: { title: '@hanz26', sub: 'AI version', emoji: '🧑' },
+  const presetLabel: Record<PresetKey, { title: string; sub: string }> = {
+    sweepy: { title: 'Sweepy', sub: '@mockey.mo' },
+    hanz26: { title: '@hanz26', sub: 'AI version' },
   };
 
   const canSubmit = prompt.trim().length > 0 && !loading;
@@ -68,16 +68,14 @@ export default function Page() {
         const msg =
           data?.error ||
           data?.message ||
-          `Request gagal (HTTP ${res.status}). Cek logs Vercel.`;
+          `Request gagal (HTTP ${res.status}).`;
         throw new Error(msg);
       }
 
       setResult(data);
 
       setTimeout(() => {
-        if (finalRef.current) {
-          finalRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        finalSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 150);
     } catch (e: any) {
       setErr(e?.message || 'Terjadi error.');
@@ -97,7 +95,7 @@ export default function Page() {
       setCopiedJson(true);
       setTimeout(() => setCopiedJson(false), 1200);
     } catch {
-      // ignore
+      // no-op
     }
   }
 
@@ -108,7 +106,7 @@ export default function Page() {
       setCopiedFinal(true);
       setTimeout(() => setCopiedFinal(false), 1200);
     } catch {
-      // ignore
+      // no-op
     }
   }
 
@@ -116,7 +114,7 @@ export default function Page() {
     const ex = exampleByPreset[preset];
     setPrompt(ex);
     setErr('');
-    generateWithText(ex); // auto-generate
+    generateWithText(ex);
   }
 
   function onClear() {
@@ -147,6 +145,7 @@ export default function Page() {
           </div>
         </header>
 
+        {/* Prompt Card */}
         <section style={S.card}>
           <div style={S.cardHead}>
             <div>
@@ -167,6 +166,7 @@ export default function Page() {
             </button>
           </div>
 
+          {/* Preset Toggle */}
           <div style={S.presetRow}>
             {(['sweepy', 'hanz26'] as PresetKey[]).map((k) => {
               const active = preset === k;
@@ -182,10 +182,7 @@ export default function Page() {
                     opacity: loading ? 0.75 : 1,
                   }}
                 >
-                  <div style={S.presetTop}>
-                    <span style={S.presetEmoji}>{presetLabel[k].emoji}</span>
-                    <span style={S.presetTitle}>{presetLabel[k].title}</span>
-                  </div>
+                  <div style={S.presetTitle}>{presetLabel[k].title}</div>
                   <div style={S.presetSub}>{presetLabel[k].sub}</div>
                 </button>
               );
@@ -204,13 +201,8 @@ export default function Page() {
           />
 
           <div style={S.miniRow}>
-            <div style={S.miniLeft}>
-              <div style={S.miniText}>
-                Preset aktif:{' '}
-                <span style={S.miniStrong}>
-                  {preset === 'sweepy' ? 'Sweepy (@mockey.mo)' : '@hanz26 (AI version)'}
-                </span>
-              </div>
+            <div style={S.miniText}>
+              Preset aktif: <span style={S.miniStrong}>{presetLabel[preset].title} ({presetLabel[preset].sub})</span>
             </div>
 
             <div style={S.miniRight}>
@@ -221,7 +213,7 @@ export default function Page() {
                 disabled={loading || prompt.length === 0}
                 style={{
                   ...S.linkBtn,
-                  opacity: loading || prompt.length === 0 ? 0.55 : 1,
+                  opacity: loading || prompt.length === 0 ? 0.5 : 1,
                   cursor: loading || prompt.length === 0 ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -256,7 +248,8 @@ export default function Page() {
           </div>
         </section>
 
-        <section style={S.card} ref={finalRef}>
+        {/* Final Prompt Card */}
+        <section style={S.card} ref={finalSectionRef}>
           <div style={S.cardHead}>
             <div>
               <div style={S.cardTitle}>Final Prompt (Copy ke Sora)</div>
@@ -284,6 +277,7 @@ export default function Page() {
           </div>
         </section>
 
+        {/* JSON Card */}
         <section style={S.card}>
           <div style={S.cardHead}>
             <div>
@@ -323,7 +317,7 @@ export default function Page() {
           </div>
         </section>
 
-        <div style={S.bottomPad} />
+        <div style={{ height: 12 }} />
       </main>
     </div>
   );
@@ -348,11 +342,7 @@ const styles: Record<string, React.CSSProperties> = {
     filter: 'blur(6px)',
     pointerEvents: 'none',
   },
-  container: {
-    maxWidth: 860,
-    margin: '0 auto',
-    position: 'relative',
-  },
+  container: { maxWidth: 860, margin: '0 auto', position: 'relative' },
   header: { marginBottom: 14 },
   brandRow: { display: 'flex', gap: 12, alignItems: 'center' },
   logoDot: {
@@ -365,6 +355,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   title: { margin: 0, fontSize: 34, letterSpacing: 1.2, lineHeight: 1.05, fontWeight: 800 },
   subtitle: { margin: '6px 0 0', opacity: 0.72, fontSize: 14 },
+
   badgeRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 },
   badge: {
     fontSize: 12,
@@ -374,6 +365,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,255,255,0.10)',
     opacity: 0.9,
   },
+
   card: {
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.10)',
@@ -393,6 +385,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   cardTitle: { fontSize: 16, fontWeight: 800, marginBottom: 4 },
   cardHint: { fontSize: 12, opacity: 0.72, lineHeight: 1.35, maxWidth: 560 },
+
   presetRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 },
   presetBtn: {
     textAlign: 'left',
@@ -407,10 +400,9 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'linear-gradient(90deg, rgba(76,245,219,0.18), rgba(106,169,255,0.12))',
     boxShadow: '0 10px 24px rgba(0,0,0,0.22)',
   },
-  presetTop: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 },
-  presetEmoji: { fontSize: 18 },
-  presetTitle: { fontWeight: 900, fontSize: 15, letterSpacing: 0.2 },
+  presetTitle: { fontWeight: 900, fontSize: 15, letterSpacing: 0.2, marginBottom: 6 },
   presetSub: { fontSize: 12, opacity: 0.78 },
+
   textarea: {
     width: '100%',
     resize: 'vertical',
@@ -425,6 +417,7 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.55,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
   },
+
   miniRow: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -433,10 +426,9 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 10,
     flexWrap: 'wrap',
   },
-  miniLeft: { flex: 1 },
-  miniRight: { display: 'flex', alignItems: 'center', gap: 10 },
   miniText: { fontSize: 12, opacity: 0.78 },
   miniStrong: { fontWeight: 800, opacity: 1 },
+  miniRight: { display: 'flex', alignItems: 'center', gap: 10 },
   charCount: { fontSize: 12, opacity: 0.78 },
   linkBtn: {
     background: 'transparent',
@@ -445,6 +437,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 800,
     padding: 6,
   },
+
   actionsRow: {
     display: 'flex',
     gap: 12,
@@ -465,6 +458,7 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 360,
     boxShadow: '0 10px 24px rgba(0,0,0,0.25)',
   },
+
   smallBtn: {
     padding: '10px 12px',
     borderRadius: 999,
@@ -475,6 +469,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     whiteSpace: 'nowrap',
   },
+
   metaRight: { flex: 1, minWidth: 220 },
   metaLine: { fontSize: 12, opacity: 0.75, marginTop: 4 },
   code: {
@@ -485,6 +480,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,255,255,0.10)',
   },
   errorText: { marginTop: 8, fontSize: 12, color: 'rgba(255,120,120,0.95)', fontWeight: 900 },
+
   resultBox: {
     background: 'rgba(0,0,0,0.35)',
     border: '1px solid rgba(255,255,255,0.10)',
@@ -503,6 +499,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   emptyState: { fontSize: 13, opacity: 0.65 },
   loadingState: { fontSize: 13, opacity: 0.85 },
+
   errorBox: {
     marginTop: 10,
     padding: 10,
@@ -512,6 +509,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   errorTitle: { fontWeight: 900, fontSize: 13, marginBottom: 4 },
   errorMsg: { fontSize: 12, opacity: 0.9 },
+
   footerNote: { marginTop: 10, fontSize: 12, opacity: 0.7, lineHeight: 1.4 },
-  bottomPad: { height: 12 },
 };
