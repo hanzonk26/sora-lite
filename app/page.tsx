@@ -1,887 +1,583 @@
-'use client';
+"use client";
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
-type PresetKey = 'sweepy' | 'hanz26' | 'general';
-type TagKey = 'daily' | 'horror' | 'review' | 'lucu';
+type StyleKey = "cinematic" | "horror" | "funny" | "ugc" | "doc" | "broll" | "weird";
+type TagKey = "horror" | "daily" | "review" | "lucu";
 
-type HistoryItem = {
-  id: string;
-  createdAt: number;
-  preset: PresetKey;
-  prompt: string;
-  finalPrompt?: string;
-  caption?: string;
-  tags: TagKey[];
+const STYLE_PRESETS: Record<StyleKey, { label: string; hint: string; prompt: string }> = {
+  cinematic: {
+    label: "Cinematic",
+    hint: "Look film, dramatis, high-end",
+    prompt:
+      "cinematic film look, high contrast, soft film grain, shallow depth of field, smooth dolly moves, dramatic lighting, professional color grading",
+  },
+  horror: {
+    label: "Horror",
+    hint: "Seram tapi aman (tanpa gore berlebihan)",
+    prompt:
+      "cinematic horror, low-key lighting, eerie shadows, subtle camera shake, suspenseful pacing, cold color temperature, creepy ambience (NO extreme gore), realistic atmosphere",
+  },
+  funny: {
+    label: "Lucu",
+    hint: "Komedi ringan, timing bagus",
+    prompt:
+      "comedic timing, playful mood, lighthearted reactions, expressive facial animation, quick punchline pacing, fun camera beats, bright but natural lighting",
+  },
+  ugc: {
+    label: "UGC",
+    hint: "Natural, handheld, relatable",
+    prompt:
+      "UGC style, handheld phone camera, natural room light, casual authentic vibe, slight camera shake, real-life imperfect framing, clear subject focus, realistic skin tones",
+  },
+  doc: {
+    label: "Doc",
+    hint: "Dokumenter, informatif",
+    prompt:
+      "documentary style, natural lighting, observational camera, realistic color, minimal stylization, clear storytelling shots, ambient sound feel",
+  },
+  // ✅ preset umum tanpa karakter spesifik
+  broll: {
+    label: "B-roll (No Character)",
+    hint: "Shot produk / tempat / suasana, cocok buat konten cepat",
+    prompt:
+      "clean b-roll sequence, no specific character, smooth gimbal shots, macro details, product highlights, environment establishing shot, crisp focus, commercial quality, minimal text, natural light",
+  },
+  // ✅ random aneh-aneh
+  weird: {
+    label: "Weird / Random",
+    hint: "Aneh tapi viral, absurd yang lucu",
+    prompt:
+      "surreal but family-friendly, weird comedic scenario, unexpected twist, quirky props, playful absurdity, cinematic but humorous, safe content, high detail, smooth motion",
+  },
 };
 
-const STORAGE_KEY = 'soraLite.history.v3.tags_caption';
-const MAX_HISTORY = 40;
-
 const TAGS: { key: TagKey; label: string }[] = [
-  { key: 'daily', label: 'daily' },
-  { key: 'horror', label: 'horror' },
-  { key: 'review', label: 'review' },
-  { key: 'lucu', label: 'lucu' },
+  { key: "horror", label: "horror" },
+  { key: "daily", label: "daily" },
+  { key: "review", label: "review" },
+  { key: "lucu", label: "lucu" },
 ];
 
-export default function Page() {
-  const [preset, setPreset] = useState<PresetKey>('sweepy');
-  const [prompt, setPrompt] = useState('');
-  const [result, setResult] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
+type SavedItem = {
+  id: string;
+  createdAt: number;
+  title: string;
+  preset: StyleKey;
+  tags: TagKey[];
+  basePrompt: string;
+  extraPrompt: string;
+};
 
-  const [copiedFinal, setCopiedFinal] = useState(false);
-  const [copiedJson, setCopiedJson] = useState(false);
-  const [copiedCaption, setCopiedCaption] = useState(false);
+const LS_KEY = "sora_lite_saved_prompts_v2";
 
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [query, setQuery] = useState('');
-  const [activeTags, setActiveTags] = useState<TagKey[]>(['daily']);
-  const [filterTag, setFilterTag] = useState<TagKey | 'all'>('all');
+function uid() {
+  return Math.random().toString(16).slice(2) + Date.now().toString(16);
+}
 
-  const finalRef = useRef<HTMLDivElement | null>(null);
+function formatDate(ts: number) {
+  const d = new Date(ts);
+  return d.toLocaleString("id-ID", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
-  const presetLabel: Record<PresetKey, { title: string; sub: string; emoji: string }> = {
-    sweepy: { title: 'Sweepy', sub: '@mockey.mo', emoji: '🐵' },
-    hanz26: { title: 'Hanz', sub: '@hanz26 (AI)', emoji: '🧑' },
-    general: { title: 'General', sub: 'Random Character', emoji: '🎲' },
-  };
+function normalizeSpaces(s: string) {
+  return s.replace(/\s+/g, " ").trim();
+}
 
-  const prettyResult = useMemo(() => {
-    if (!result) return '';
-    try {
-      return JSON.stringify(result, null, 2);
-    } catch {
-      return String(result);
-    }
-  }, [result]);
+function buildFinalPrompt(preset: StyleKey, basePrompt: string, extraPrompt: string) {
+  const a = normalizeSpaces(basePrompt);
+  const b = normalizeSpaces(extraPrompt);
+  const style = STYLE_PRESETS[preset].prompt;
 
-  const finalPrompt = useMemo(() => {
-    return result?.output?.finalPrompt ? String(result.output.finalPrompt) : '';
-  }, [result]);
+  // Format yang enak dipakai di Sora:
+  // 1) inti adegan (base)
+  // 2) style / cinematic rules (preset)
+  // 3) tambahan (extra)
+  const parts = [
+    a ? a : "",
+    style ? `Style: ${style}` : "",
+    b ? `Extra: ${b}` : "",
+  ].filter(Boolean);
 
-  function pick<T>(arr: T[]) {
-    return arr[Math.floor(Math.random() * arr.length)];
+  return parts.join("\n");
+}
+
+function buildCaption(preset: StyleKey, tags: TagKey[], basePrompt: string, extraPrompt: string) {
+  const tagLine = tags.length ? tags : (["daily"] as TagKey[]);
+  const tone =
+    preset === "horror"
+      ? "Serem-serem dikit, tapi tetap aman 😄"
+      : preset === "funny" || preset === "weird"
+      ? "Yang penting ngakak dulu 😆"
+      : preset === "ugc"
+      ? "Vibes-nya natural banget."
+      : preset === "doc"
+      ? "Biar berasa dokumenter beneran."
+      : preset === "broll"
+      ? "B-roll clean, cocok buat konten cepat."
+      : "Cinematic mode on 🎬";
+
+  const core = normalizeSpaces(basePrompt);
+  const extra = normalizeSpaces(extraPrompt);
+
+  // Caption Indonesia, singkat, relevan
+  const lines: string[] = [];
+  lines.push(tone);
+  if (core) lines.push(`Scene: ${core}`);
+  if (extra) lines.push(`Detail: ${extra}`);
+  lines.push(`Tag: ${tagLine.join(" / ")}`);
+  lines.push("Kalau kamu mau versi lain (lebih cepat / lebih lucu / lebih dark), bilang ya.");
+
+  return lines.join("\n");
+}
+
+function buildHashtags(preset: StyleKey, tags: TagKey[]) {
+  const base = new Set<string>();
+
+  // selalu 2-3 umum
+  base.add("#sora");
+  base.add("#aivideo");
+  base.add("#kontenAI");
+
+  // preset-based
+  if (preset === "horror") base.add("#horror");
+  if (preset === "ugc") base.add("#ugc");
+  if (preset === "doc") base.add("#dokumenter");
+  if (preset === "broll") base.add("#broll");
+  if (preset === "cinematic") base.add("#cinematic");
+  if (preset === "funny" || preset === "weird") base.add("#lucu");
+
+  // tag-based
+  for (const t of tags) {
+    if (t === "daily") base.add("#daily");
+    if (t === "review") base.add("#review");
+    if (t === "horror") base.add("#horror");
+    if (t === "lucu") base.add("#lucu");
   }
 
-  /* =======================
-     localStorage load/save
-     ======================= */
+  // pastikan tepat 5 hashtag
+  const arr = Array.from(base);
+  return arr.slice(0, 5);
+}
+
+function safeParseSaved(raw: string | null): SavedItem[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((x) => {
+        if (!x || typeof x !== "object") return null;
+        const preset = (x.preset ?? "cinematic") as StyleKey;
+        const tags = Array.isArray(x.tags) ? (x.tags as TagKey[]) : ([] as TagKey[]);
+        return {
+          id: String(x.id ?? uid()),
+          createdAt: Number(x.createdAt ?? Date.now()),
+          title: String(x.title ?? "Untitled"),
+          preset,
+          tags,
+          basePrompt: String(x.basePrompt ?? ""),
+          extraPrompt: String(x.extraPrompt ?? ""),
+        } satisfies SavedItem;
+      })
+      .filter(Boolean) as SavedItem[];
+  } catch {
+    return [];
+  }
+}
+
+export default function Page() {
+  const [preset, setPreset] = useState<StyleKey>("cinematic");
+  const [activeTags, setActiveTags] = useState<TagKey[]>(["daily"]);
+  const [basePrompt, setBasePrompt] = useState<string>("");
+  const [extraPrompt, setExtraPrompt] = useState<string>("");
+
+  const [saved, setSaved] = useState<SavedItem[]>([]);
+  const [search, setSearch] = useState<string>("");
+  const [toast, setToast] = useState<string>("");
+
+  const toastTimer = useRef<number | null>(null);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(""), 1600);
+  }
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) setHistory(parsed);
-    } catch {
-      // ignore
-    }
+    const initial = safeParseSaved(typeof window !== "undefined" ? localStorage.getItem(LS_KEY) : null);
+    setSaved(initial.sort((a, b) => b.createdAt - a.createdAt));
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, MAX_HISTORY)));
-    } catch {
-      // ignore
-    }
-  }, [history]);
+    if (typeof window === "undefined") return;
+    localStorage.setItem(LS_KEY, JSON.stringify(saved));
+  }, [saved]);
 
-  function addToHistory(item: Omit<HistoryItem, 'id' | 'createdAt'>) {
-    const entry: HistoryItem = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      createdAt: Date.now(),
-      ...item,
-    };
-    setHistory((prev) => [entry, ...prev].slice(0, MAX_HISTORY));
-  }
+  const finalPrompt = useMemo(() => {
+    return buildFinalPrompt(preset, basePrompt, extraPrompt);
+  }, [preset, basePrompt, extraPrompt]);
 
-  function removeFromHistory(id: string) {
-    setHistory((prev) => prev.filter((x) => x.id !== id));
-  }
-
-  function clearHistory() {
-    setHistory([]);
-  }
-
-  function toggleTag(list: TagKey[], t: TagKey) {
-    return list.includes(t) ? list.filter((x) => x !== t) : [...list, t];
-  }
-
-  function formatDate(ms: number) {
-    try {
-      return new Date(ms).toLocaleString();
-    } catch {
-      return String(ms);
-    }
-  }
-
-  /* =======================
-     Caption + hashtags
-     ======================= */
-
-  function getPrimaryTag(tags: TagKey[]): TagKey {
-    // urutan prioritas
-    const order: TagKey[] = ['review', 'horror', 'lucu', 'daily'];
-    for (const t of order) if (tags.includes(t)) return t;
-    return 'daily';
-  }
-
-  function buildHashtags(preset: PresetKey, tags: TagKey[]) {
-    const t = getPrimaryTag(tags);
-
-    const base = ['#soralite', '#aicontent', '#aivideo'];
-    const presetTags =
-      preset === 'sweepy'
-        ? ['#mockeymo', '#sweepy']
-        : preset === 'hanz26'
-          ? ['#hanz26', '#ugc']
-          : ['#randomcharacter', '#creativeai'];
-
-    const mood =
-      t === 'review'
-        ? ['#review', '#softselling']
-        : t === 'horror'
-          ? ['#horor', '#creepy']
-          : t === 'lucu'
-            ? ['#lucu', '#komedi']
-            : ['#daily', '#vlog'];
-
-    // Ambil 5 saja, unik
-    const all = [...base, ...presetTags, ...mood];
-    const uniq: string[] = [];
-    for (const x of all) {
-      if (!uniq.includes(x)) uniq.push(x);
-      if (uniq.length >= 5) break;
-    }
-    return uniq;
-  }
-
-  function buildCaption(preset: PresetKey, tags: TagKey[], idea: string, finalP: string) {
-    const t = getPrimaryTag(tags);
-
-    // Judul singkat (1 baris)
-    const titlesByTag: Record<TagKey, string[]> = {
-      daily: ['Daily vibe yang simpel tapi enak ditonton', 'Momen kecil, feel besar', 'Konten harian yang relatable'],
-      horror: ['Horor tipis tapi bikin merinding', 'Ada yang “hampir” kejadian…', 'Tegang sebentar, aman kok'],
-      review: ['Review singkat, no hard sell', 'Yang penting: jujur & jelas', 'Soft selling yang nggak ganggu'],
-      lucu: ['Kocak natural, bukan lebay', 'Reaksi kecil tapi ngakak', 'Komedi tipis yang pas'],
-    };
-
-    const tone =
-      preset === 'hanz26'
-        ? 'Santai, rapi, trendi.'
-        : preset === 'sweepy'
-          ? 'Lucu, natural, ekspresif.'
-          : 'Unik, random, tetap jelas.';
-
-    // CTA ringan
-    const ctaByTag: Record<TagKey, string[]> = {
-      daily: ['Kalau suka konten daily begini, lanjut Part 2?', 'Team daily vlog atau team cinematic?'],
-      horror: ['Berani lanjut versi lebih tegang?', 'Mau Part 2 yang lebih creepy tapi tetap aman?'],
-      review: ['Kalau kamu mau aku review versi lain, komen ya.', 'Mau aku bikin versi 2 dengan angle berbeda?'],
-      lucu: ['Tag temen yang bakal ketawa.', 'Kalau kamu relate, drop emoji 😂'],
-    };
-
-    // 1 kalimat ringkas tentang ide (diambil dari idea/prompt user)
-    const gist = (idea || finalP || '').trim().slice(0, 140);
-
-    const title = pick(titlesByTag[t]);
-    const cta = pick(ctaByTag[t]);
-
-    return `${title}\n${tone}\n\n${gist}${gist.length >= 140 ? '…' : ''}\n\n${cta}`;
-  }
-
-  const autoCaption = useMemo(() => {
-    if (!prompt.trim() && !finalPrompt) return '';
-    const tags = activeTags.length ? activeTags : ['daily'];
-    const cap = buildCaption(preset, tags, prompt.trim(), finalPrompt);
-    const hash = buildHashtags(preset, tags).join(' ');
+  const captionPack = useMemo(() => {
+    const tags: TagKey[] = activeTags.length ? activeTags : ["daily"];
+    const cap = buildCaption(preset, tags, basePrompt, extraPrompt);
+    const hash = buildHashtags(preset, tags).join(" ");
     return `${cap}\n\n${hash}`;
-  }, [preset, activeTags, prompt, finalPrompt]);
+  }, [preset, activeTags, basePrompt, extraPrompt]);
 
-  /* =======================
-     Auto idea generators
-     ======================= */
+  const filteredSaved = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return saved;
+    return saved.filter((s) => {
+      const blob = `${s.title} ${s.preset} ${s.tags.join(" ")} ${s.basePrompt} ${s.extraPrompt}`.toLowerCase();
+      return blob.includes(q);
+    });
+  }, [saved, search]);
 
-  function makeSweepyIdea() {
-    const places = ['teras rumah sore hari', 'ruang tamu dengan TV tua', 'dapur sederhana malam hari', 'halaman kecil belakang rumah'];
-    const actions = ['duduk santai sambil ngopi', 'nonton TV sambil ngemil', 'menyapu halaman dengan ekspresi malas tapi lucu', 'membereskan meja kecil terlalu serius'];
-    const twistsDaily = ['ngopi sambil denger musik pelan', 'rapihin barang kecil biar rapi', 'cek HP lalu senyum tipis', 'jalan santai sebentar'];
-    const twistsHorror = ['TV jadi statis sebentar lalu normal', 'pintu berderit, ternyata angin', 'bayangan pantulan bikin kaget tipis', 'suara kecil bikin salah fokus (aman)'];
-    const twistsFunny = ['gelas hampir jatuh lalu diselamatkan panik', 'sadar kamera lalu sok cool', 'salah pencet remote jadi mute lalu bengong', 'kaget notifikasi lalu pura-pura tidak terjadi apa-apa'];
-
-    const wantsHorror = activeTags.includes('horror');
-    const wantsFunny = activeTags.includes('lucu');
-    const wantsReview = activeTags.includes('review');
-
-    if (wantsReview) {
-      return `@mockey.mo (Sweepy) review singkat gaya lucu: pegang produk sederhana (misal botol minum / snack) dan jelaskan 1 kelebihan dengan ekspresi polos. ONE SCENE ONLY, natural, durasi 10–12 detik.`;
-    }
-    if (wantsHorror) {
-      return `@mockey.mo (Sweepy) berada di ${pick(places)}. ${pick(actions)}. Horor ringan aman: ${pick(
-        twistsHorror
-      )}. Ending lucu tipis (Sweepy lega/nyengir). ONE SCENE ONLY, durasi 10–12 detik.`;
-    }
-    if (wantsFunny) {
-      return `@mockey.mo (Sweepy) berada di ${pick(places)}. ${pick(actions)}. Twist lucu: ${pick(
-        twistsFunny
-      )}. ONE SCENE ONLY, ekspresi jelas, durasi 10–12 detik.`;
-    }
-    return `@mockey.mo (Sweepy) berada di ${pick(places)}. ${pick(pick([actions, twistsDaily]))}. Suasana hangat, natural. ONE SCENE ONLY, durasi 10–12 detik.`;
+  function toggleTag(tag: TagKey) {
+    setActiveTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   }
 
-  function makeHanzIdea() {
-    const outfits = [
-      'clean minimal outfit: kaos polos premium + celana rapi + sneakers putih',
-      'smart casual: kemeja linen netral + chino',
-      'jaket tipis modern warna earthy + celana rapi',
-    ];
-    const places = ['kamar rapi dengan cahaya jendela', 'kafe minimalis yang tenang', 'teras rumah sore hari'];
-
-    const hooksDaily = [
-      '“Gue dulu sering mager… tapi ini cara paling simpel yang bikin gue jalan.”',
-      '“Kalau lagi drop, gue cuma fokus 1 hal ini.”',
-      '“Bukan motivasi, tapi kebiasaan kecil yang bikin konsisten.”',
-    ];
-
-    const topicsDaily = [
-      'tips singkat biar tetap konsisten hidup sehat',
-      'rutinitas 1 menit yang bikin mood naik',
-      'cara bikin sistem biar gak ngandelin niat',
-      'pengingat progress kecil tapi konsisten',
-    ];
-
-    const topicsReview = [
-      'soft review produk (tanpa nyebut brand): 1 manfaat + 1 cara pakai',
-      'review singkat barang daily: kenyamanan + alasan rekomendasi',
-      'soft selling halus: cocok buat siapa + kapan dipakai',
-    ];
-
-    const wantsHorror = activeTags.includes('horror');
-    const wantsFunny = activeTags.includes('lucu');
-    const wantsReview = activeTags.includes('review');
-
-    if (wantsHorror) {
-      return `@hanz26 tampil rapi dengan ${pick(outfits)} di ${pick(
-        places
-      )}. Nuansa misterius ringan (bukan jumpscare): ambience tenang, Hanz menoleh pelan lalu senyum tipis menutup. ONE SCENE ONLY, durasi 10–12 detik, tetap tenang.`;
+  async function copy(text: string, okMsg: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast(okMsg);
+    } catch {
+      // fallback
+      const el = document.createElement("textarea");
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      showToast(okMsg);
     }
-    if (wantsFunny) {
-      return `@hanz26 tampil rapi dengan ${pick(outfits)} di ${pick(
-        places
-      )}. Komedi subtle: salah ucap kecil lalu ketawa tipis, tetap cool dan trendi. ONE SCENE ONLY, durasi 10–12 detik.`;
-    }
-    if (wantsReview) {
-      return `@hanz26 tampil rapi dengan ${pick(outfits)} di ${pick(
-        places
-      )}. Gaya UGC tenang. Bahas: ${pick(
-        topicsReview
-      )}. Bahasa Indonesia, natural, tidak hard sell. ONE SCENE ONLY, durasi 10–12 detik.`;
-    }
-    return `@hanz26 tampil rapi dan trendi dengan ${pick(outfits)} di ${pick(
-      places
-    )}. Buka dengan hook: ${pick(hooksDaily)} Lalu bahas: ${pick(
-      topicsDaily
-    )}. Nada tenang, santai, percaya diri. ONE SCENE ONLY, durasi 10–12 detik.`;
   }
 
-  function makeGeneralIdea() {
-    const characters = [
-      'seekor monyet realistis dengan ekspresi santai',
-      'seekor monyet kartunis lucu',
-      'seorang pria anonim tanpa identitas spesifik',
-      'seorang wanita anonim dengan tampilan sederhana',
-      'makhluk humanoid aneh tapi bersahabat',
-      'karakter manusia semi-kartun',
-      'makhluk absurd unik yang tidak nyata',
-      'sosok misterius silhouette tanpa wajah jelas',
+  function quickRandomIdea() {
+    const ideas = [
+      "Seekor monyet hoodie lucu dan seorang manusia sedang rebutan remote TV, lalu akur dan ketawa bareng.",
+      "Seorang manusia memasak mie, tapi sendoknya berubah jadi mikrofon dan dia tiba-tiba nge-rap.",
+      "Monyet kecil jadi ‘reviewer’ produk, lalu ada cutaway b-roll detail produk super niat.",
+      "Suasana malam hujan, kamera dari belakang, ada bayangan aneh lewat… ternyata cuma kucing lucu.",
+      "B-roll tangan membuka paket, close-up tekstur, lalu reveal hasilnya di meja dengan lighting clean.",
     ];
-    const actions = ['duduk santai sambil minum kopi', 'mengamati sekitar dengan ekspresi penasaran', 'berjalan pelan lalu berhenti', 'melakukan aktivitas harian sederhana', 'bereaksi kecil terhadap suara atau gerakan'];
-    const places = ['kafe minimalis', 'ruang indoor sederhana', 'gang kecil habis hujan', 'latar netral studio', 'ruangan dengan cahaya dramatis'];
-
-    const vibe = activeTags.includes('horror')
-      ? 'misterius ringan dan aman (tanpa jumpscare ekstrem)'
-      : activeTags.includes('lucu')
-        ? 'absurd lucu tapi tetap readable'
-        : activeTags.includes('review')
-          ? 'review singkat barang random (tanpa brand)'
-          : 'daily natural';
-
-    const reviewAdd = activeTags.includes('review')
-      ? ' Pegang satu objek sederhana (misal botol minum / snack) dan tunjukkan 1 kelebihan dengan cara natural.'
-      : '';
-
-    return `GENERAL RANDOM. Vibe: ${vibe}. Character: ${pick(characters)}. Action: ${pick(actions)}.${reviewAdd} Location: ${pick(
-      places
-    )}. ONE SCENE ONLY, durasi 10–15 detik. No real person identity, no text overlay.`;
+    const pick = ideas[Math.floor(Math.random() * ideas.length)];
+    setBasePrompt(pick);
+    showToast("Random idea dimasukkan.");
   }
 
-  function makeAutoIdea() {
-    if (preset === 'sweepy') return makeSweepyIdea();
-    if (preset === 'hanz26') return makeHanzIdea();
-    return makeGeneralIdea();
-  }
-
-  /* =======================
-     API
-     ======================= */
-
-  async function generateWithText(text: string) {
-    const p = text.trim();
-    if (!p) {
-      setErr('Prompt tidak boleh kosong.');
+  function saveCurrent() {
+    const core = normalizeSpaces(basePrompt);
+    if (!core) {
+      showToast("Isi dulu prompt utamanya.");
       return;
     }
+    const title =
+      core.length > 42 ? core.slice(0, 42).trim() + "…" : core || "Prompt";
 
-    setLoading(true);
-    setErr('');
-    setResult(null);
-    setCopiedFinal(false);
-    setCopiedJson(false);
-    setCopiedCaption(false);
-
-    try {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: p, preset, tags: activeTags }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Request gagal');
-
-      setResult(data);
-
-      const fp = data?.output?.finalPrompt ? String(data.output.finalPrompt) : '';
-      const cap = buildCaption(preset, activeTags.length ? activeTags : ['daily'], p, fp);
-      const hash = buildHashtags(preset, activeTags.length ? activeTags : ['daily']).join(' ');
-      const capFull = `${cap}\n\n${hash}`;
-
-      addToHistory({
-        preset,
-        prompt: p,
-        finalPrompt: fp,
-        caption: capFull,
-        tags: activeTags.length ? activeTags : ['daily'],
-      });
-
-      setTimeout(() => finalRef.current?.scrollIntoView({ behavior: 'smooth' }), 150);
-    } catch (e: any) {
-      setErr(e?.message || 'Terjadi error.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function onGenerate() {
-    await generateWithText(prompt);
-  }
-
-  async function onAutoGenerate() {
-    const idea = makeAutoIdea();
-    setPrompt(idea);
-    await generateWithText(idea);
-  }
-
-  async function onCopyFinal(text?: string) {
-    const t = (text ?? finalPrompt ?? '').trim();
-    if (!t) return;
-    await navigator.clipboard.writeText(t);
-    setCopiedFinal(true);
-    setTimeout(() => setCopiedFinal(false), 1200);
-  }
-
-  async function onCopyCaption(text?: string) {
-    const t = (text ?? autoCaption ?? '').trim();
-    if (!t) return;
-    await navigator.clipboard.writeText(t);
-    setCopiedCaption(true);
-    setTimeout(() => setCopiedCaption(false), 1200);
-  }
-
-  async function onCopyJson() {
-    if (!prettyResult) return;
-    await navigator.clipboard.writeText(prettyResult);
-    setCopiedJson(true);
-    setTimeout(() => setCopiedJson(false), 1200);
-  }
-
-  function onClear() {
-    setPrompt('');
-    setErr('');
-  }
-
-  function onSaveManual() {
-    const p = prompt.trim();
-    if (!p) return;
-    addToHistory({
+    const item: SavedItem = {
+      id: uid(),
+      createdAt: Date.now(),
+      title,
       preset,
-      prompt: p,
-      finalPrompt: finalPrompt || '',
-      caption: autoCaption || '',
-      tags: activeTags.length ? activeTags : ['daily'],
-    });
+      tags: activeTags.length ? activeTags : ["daily"],
+      basePrompt,
+      extraPrompt,
+    };
+
+    setSaved((prev) => [item, ...prev]);
+    showToast("Tersimpan ke history ✅");
   }
 
-  function updateHistoryTags(id: string, tag: TagKey) {
-    setHistory((prev) =>
-      prev.map((x) => {
-        if (x.id !== id) return x;
-        const nextTags = toggleTag(x.tags || [], tag);
-        return { ...x, tags: nextTags.length ? nextTags : ['daily'] };
-      })
-    );
+  function loadItem(item: SavedItem) {
+    setPreset(item.preset);
+    setActiveTags(item.tags.length ? item.tags : ["daily"]);
+    setBasePrompt(item.basePrompt);
+    setExtraPrompt(item.extraPrompt);
+    showToast("Loaded dari history.");
   }
 
-  const filteredHistory = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return history.filter((h) => {
-      const matchesQ =
-        !q ||
-        h.prompt.toLowerCase().includes(q) ||
-        (h.finalPrompt || '').toLowerCase().includes(q) ||
-        (h.caption || '').toLowerCase().includes(q) ||
-        h.preset.toLowerCase().includes(q) ||
-        (h.tags || []).join(',').toLowerCase().includes(q);
+  function deleteItem(id: string) {
+    setSaved((prev) => prev.filter((x) => x.id !== id));
+    showToast("Dihapus.");
+  }
 
-      const matchesTag = filterTag === 'all' ? true : (h.tags || []).includes(filterTag);
-      return matchesQ && matchesTag;
-    });
-  }, [history, query, filterTag]);
-
-  /* =======================
-     UI styles
-     ======================= */
-
-  const bg = '#0b1220';
-  const card = '#0f172a';
-  const border = 'rgba(255,255,255,0.12)';
-  const text = 'rgba(255,255,255,0.92)';
-  const sub = 'rgba(255,255,255,0.68)';
-
-  const chip = (active: boolean) => ({
-    padding: '8px 10px',
-    borderRadius: 999,
-    border: `1px solid ${active ? 'rgba(76,245,219,0.35)' : border}`,
-    background: active ? 'rgba(76,245,219,0.10)' : 'rgba(255,255,255,0.06)',
-    color: text,
-    fontWeight: 900 as const,
-    fontSize: 13,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap' as const,
-  });
+  function clearAll() {
+    setBasePrompt("");
+    setExtraPrompt("");
+    setActiveTags(["daily"]);
+    showToast("Dibersihkan.");
+  }
 
   return (
-    <div style={{ minHeight: '100vh', background: bg, color: text, padding: 16, fontFamily: 'system-ui' }}>
-      <main style={{ maxWidth: 860, margin: '0 auto' }}>
-        <header style={{ marginBottom: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 900, letterSpacing: 0.4 }}>SORA LITE</h1>
-          <div style={{ marginTop: 6, color: sub }}>Daily Content Generator · Single Scene · Tags + History + Auto Caption</div>
+    <main className="min-h-screen bg-neutral-950 text-neutral-100">
+      <div className="mx-auto w-full max-w-5xl px-4 py-8">
+        <header className="mb-6">
+          <h1 className="text-2xl font-semibold">Sora Lite – Prompt Builder</h1>
+          <p className="mt-1 text-sm text-neutral-300">
+            Preset + Tag + Caption + 5 Hashtag + History (local).
+          </p>
         </header>
 
-        {/* Preset */}
-        <section style={{ background: card, border: `1px solid ${border}`, borderRadius: 16, padding: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            {(Object.keys(presetLabel) as PresetKey[]).map((k) => {
+        {/* Presets */}
+        <section className="mb-6 rounded-2xl bg-neutral-900/60 p-4 shadow">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-medium">Preset Style</h2>
+              <p className="text-sm text-neutral-300">
+                Pilih gaya visual. Ada juga preset <b>B-roll</b> (tanpa karakter) dan <b>Weird</b> buat yang absurd.
+              </p>
+            </div>
+            <button
+              onClick={quickRandomIdea}
+              className="rounded-xl bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white"
+            >
+              Random Idea
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(Object.keys(STYLE_PRESETS) as StyleKey[]).map((k) => {
               const active = preset === k;
               return (
                 <button
                   key={k}
-                  type="button"
                   onClick={() => setPreset(k)}
-                  disabled={loading}
-                  style={{
-                    padding: 10,
-                    borderRadius: 14,
-                    border: `1px solid ${active ? 'rgba(106,169,255,0.35)' : border}`,
-                    background: active ? 'rgba(106,169,255,0.10)' : '#0b1220',
-                    color: text,
-                    textAlign: 'left',
-                  }}
+                  className={[
+                    "rounded-full px-3 py-2 text-sm transition",
+                    active
+                      ? "bg-white text-neutral-950"
+                      : "bg-neutral-800 text-neutral-100 hover:bg-neutral-700",
+                  ].join(" ")}
+                  title={STYLE_PRESETS[k].hint}
                 >
-                  <div style={{ fontWeight: 900 }}>
-                    {presetLabel[k].emoji} {presetLabel[k].title}
-                  </div>
-                  <div style={{ fontSize: 12, color: sub }}>{presetLabel[k].sub}</div>
+                  {STYLE_PRESETS[k].label}
                 </button>
               );
             })}
           </div>
 
-          {/* Tags select */}
-          <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 12, color: sub, fontWeight: 800, marginBottom: 8 }}>Tags (mood & jenis konten)</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {TAGS.map((t) => {
-                const active = activeTags.includes(t.key);
-                return (
-                  <button key={t.key} type="button" style={chip(active)} onClick={() => setActiveTags((prev) => toggleTag(prev, t.key))}>
-                    #{t.label}
-                  </button>
-                );
-              })}
-              <button type="button" style={chip(false)} onClick={() => setActiveTags(['daily'])} title="Reset tag ke daily">
-                reset
+          <div className="mt-3 rounded-xl bg-neutral-950/60 p-3 text-sm text-neutral-200">
+            <div className="font-medium">Preset detail</div>
+            <div className="mt-1 text-neutral-300">{STYLE_PRESETS[preset].hint}</div>
+            <div className="mt-2 whitespace-pre-wrap text-neutral-200">
+              {STYLE_PRESETS[preset].prompt}
+            </div>
+          </div>
+        </section>
+
+        {/* Tags */}
+        <section className="mb-6 rounded-2xl bg-neutral-900/60 p-4 shadow">
+          <h2 className="text-lg font-medium">Tag</h2>
+          <p className="text-sm text-neutral-300">Klik untuk aktif/nonaktif.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {TAGS.map((t) => {
+              const active = activeTags.includes(t.key);
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => toggleTag(t.key)}
+                  className={[
+                    "rounded-full px-3 py-2 text-sm transition",
+                    active ? "bg-emerald-400 text-neutral-950" : "bg-neutral-800 hover:bg-neutral-700",
+                  ].join(" ")}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-2 text-xs text-neutral-400">
+            * Kalau tidak pilih apa-apa, default: <b>daily</b>
+          </div>
+        </section>
+
+        {/* Prompt input */}
+        <section className="mb-6 grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl bg-neutral-900/60 p-4 shadow">
+            <h2 className="text-lg font-medium">Prompt Utama</h2>
+            <p className="text-sm text-neutral-300">Isi inti adegan / cerita.</p>
+            <textarea
+              value={basePrompt}
+              onChange={(e) => setBasePrompt(e.target.value)}
+              rows={8}
+              placeholder="Contoh: Karakter monyet hoodie lucu sedang membersihkan selokan penuh sampah plastik, timelapse 15 detik, suasana pagi..."
+              className="mt-3 w-full resize-none rounded-xl bg-neutral-950/60 p-3 text-sm outline-none ring-1 ring-neutral-800 focus:ring-2 focus:ring-white/40"
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={saveCurrent}
+                className="rounded-xl bg-white px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-neutral-200"
+              >
+                Save to History
               </button>
-            </div>
-          </div>
-
-          <textarea
-            value={prompt}
-            onChange={(e) => {
-              setPrompt(e.target.value);
-              if (err) setErr('');
-            }}
-            placeholder="Tulis ide… atau tekan Auto-generate."
-            rows={6}
-            style={{
-              width: '100%',
-              marginTop: 12,
-              padding: 12,
-              borderRadius: 14,
-              border: `1px solid ${border}`,
-              background: '#07101f',
-              color: text,
-              outline: 'none',
-              lineHeight: 1.5,
-            }}
-          />
-
-          {/* Buttons */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-            <button
-              onClick={onAutoGenerate}
-              disabled={loading}
-              style={{
-                padding: 12,
-                borderRadius: 14,
-                border: `1px solid ${border}`,
-                background: 'rgba(76,245,219,0.18)',
-                color: text,
-                fontWeight: 900,
-              }}
-            >
-              {loading ? 'Generating…' : 'Auto-generate'}
-            </button>
-
-            <button
-              onClick={onGenerate}
-              disabled={!prompt.trim() || loading}
-              style={{
-                padding: 12,
-                borderRadius: 14,
-                border: `1px solid ${border}`,
-                background: !prompt.trim() || loading ? 'rgba(255,255,255,0.06)' : 'rgba(106,169,255,0.18)',
-                color: text,
-                fontWeight: 900,
-                opacity: !prompt.trim() || loading ? 0.7 : 1,
-              }}
-            >
-              Generate
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-            <div style={{ fontSize: 12, color: sub }}>
-              <span>Selected: </span>
-              <span style={{ fontWeight: 900 }}>{activeTags.length ? activeTags.map((t) => `#${t}`).join(' ') : '#daily'}</span>
-            </div>
-
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <div style={{ fontSize: 12, color: sub }}>{prompt.length} chars</div>
-              <button type="button" onClick={onClear} disabled={loading || !prompt.length} style={{ background: 'transparent', border: 'none', color: 'rgba(76,245,219,0.95)', fontWeight: 900 }}>
+              <button
+                onClick={clearAll}
+                className="rounded-xl bg-neutral-800 px-3 py-2 text-sm hover:bg-neutral-700"
+              >
                 Clear
               </button>
-              <button type="button" onClick={onSaveManual} disabled={loading || !prompt.trim()} style={{ background: 'transparent', border: 'none', color: 'rgba(106,169,255,0.95)', fontWeight: 900 }}>
-                Save
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-neutral-900/60 p-4 shadow">
+            <h2 className="text-lg font-medium">Extra (Opsional)</h2>
+            <p className="text-sm text-neutral-300">
+              Detail tambahan: durasi, angle kamera, lighting, larangan (no text, no logo), dll.
+            </p>
+            <textarea
+              value={extraPrompt}
+              onChange={(e) => setExtraPrompt(e.target.value)}
+              rows={8}
+              placeholder="Contoh: 10–15 detik, 9:16, kamera dari belakang, slow push-in, NO watermark, NO text overlay, natural sound..."
+              className="mt-3 w-full resize-none rounded-xl bg-neutral-950/60 p-3 text-sm outline-none ring-1 ring-neutral-800 focus:ring-2 focus:ring-white/40"
+            />
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => copy(finalPrompt, "Prompt copied ✅")}
+                className="rounded-xl bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white"
+              >
+                Copy Prompt
+              </button>
+              <button
+                onClick={() => copy(captionPack, "Caption + hashtag copied ✅")}
+                className="rounded-xl bg-neutral-800 px-3 py-2 text-sm hover:bg-neutral-700"
+              >
+                Copy Caption
               </button>
             </div>
           </div>
-
-          {err ? <div style={{ marginTop: 10, color: 'rgba(255,120,120,0.95)', fontWeight: 900 }}>{err}</div> : null}
         </section>
 
-        {/* Final prompt + caption */}
-        <section ref={finalRef} style={{ marginTop: 12, background: card, border: `1px solid ${border}`, borderRadius: 16, padding: 12 }}>
-          {/* Final Prompt */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 900 }}>Final Prompt</div>
-              <div style={{ fontSize: 12, color: sub }}>Copy ini ke Sora (bukan JSON).</div>
+        {/* Output */}
+        <section className="mb-6 grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl bg-neutral-900/60 p-4 shadow">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-medium">Final Prompt</h2>
+              <button
+                onClick={() => copy(finalPrompt, "Prompt copied ✅")}
+                className="rounded-lg bg-neutral-800 px-2 py-1 text-xs hover:bg-neutral-700"
+              >
+                Copy
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => onCopyFinal()}
-              disabled={!finalPrompt}
-              style={{
-                padding: '10px 12px',
-                borderRadius: 999,
-                border: `1px solid ${border}`,
-                background: 'rgba(255,255,255,0.06)',
-                color: text,
-                fontWeight: 900,
-                opacity: finalPrompt ? 1 : 0.6,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {copiedFinal ? 'Copied ✅' : 'Copy Final'}
-            </button>
+            <pre className="mt-3 whitespace-pre-wrap rounded-xl bg-neutral-950/60 p-3 text-sm text-neutral-100 ring-1 ring-neutral-800">
+              {finalPrompt || "— isi prompt dulu —"}
+            </pre>
           </div>
 
-          <div style={{ marginTop: 10, padding: 12, borderRadius: 14, border: `1px solid ${border}`, background: '#07101f', minHeight: 110 }}>
-            {!finalPrompt && !loading ? <div style={{ color: sub }}>Belum ada hasil. Tekan Generate / Auto-generate.</div> : null}
-            {loading ? <div style={{ color: sub }}>Sedang proses…</div> : null}
-            {finalPrompt ? <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.55 }}>{finalPrompt}</pre> : null}
-          </div>
-
-          {/* Caption */}
-          <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 900 }}>Auto Caption + 5 Hashtags</div>
-              <div style={{ fontSize: 12, color: sub }}>Copy buat TikTok/IG (caption + hashtag otomatis).</div>
+          <div className="rounded-2xl bg-neutral-900/60 p-4 shadow">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-medium">Auto Caption + 5 Hashtag</h2>
+              <button
+                onClick={() => copy(captionPack, "Caption copied ✅")}
+                className="rounded-lg bg-neutral-800 px-2 py-1 text-xs hover:bg-neutral-700"
+              >
+                Copy
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => onCopyCaption()}
-              disabled={!autoCaption}
-              style={{
-                padding: '10px 12px',
-                borderRadius: 999,
-                border: `1px solid ${border}`,
-                background: 'rgba(76,245,219,0.10)',
-                color: text,
-                fontWeight: 900,
-                opacity: autoCaption ? 1 : 0.6,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {copiedCaption ? 'Copied ✅' : 'Copy Caption'}
-            </button>
-          </div>
-
-          <div style={{ marginTop: 10, padding: 12, borderRadius: 14, border: `1px solid ${border}`, background: '#07101f', minHeight: 110 }}>
-            {!autoCaption && !loading ? <div style={{ color: sub }}>Caption akan muncul setelah ada prompt/final prompt.</div> : null}
-            {autoCaption ? <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.55 }}>{autoCaption}</pre> : null}
+            <pre className="mt-3 whitespace-pre-wrap rounded-xl bg-neutral-950/60 p-3 text-sm text-neutral-100 ring-1 ring-neutral-800">
+              {captionPack}
+            </pre>
           </div>
         </section>
 
-        {/* JSON */}
-        <section style={{ marginTop: 12, background: card, border: `1px solid ${border}`, borderRadius: 16, padding: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+        {/* History */}
+        <section className="rounded-2xl bg-neutral-900/60 p-4 shadow">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <div style={{ fontSize: 16, fontWeight: 900 }}>Response JSON</div>
-              <div style={{ fontSize: 12, color: sub }}>Kalau mau inspect output, copy JSON.</div>
+              <h2 className="text-lg font-medium">History</h2>
+              <p className="text-sm text-neutral-300">Tersimpan di browser (localStorage).</p>
             </div>
-            <button
-              type="button"
-              onClick={onCopyJson}
-              disabled={!prettyResult}
-              style={{
-                padding: '10px 12px',
-                borderRadius: 999,
-                border: `1px solid ${border}`,
-                background: 'rgba(255,255,255,0.06)',
-                color: text,
-                fontWeight: 900,
-                opacity: prettyResult ? 1 : 0.6,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {copiedJson ? 'Copied ✅' : 'Copy JSON'}
-            </button>
-          </div>
 
-          <div style={{ marginTop: 10, padding: 12, borderRadius: 14, border: `1px solid ${border}`, background: '#07101f', minHeight: 110 }}>
-            {!prettyResult && !loading ? <div style={{ color: sub }}>Belum ada hasil.</div> : null}
-            {loading ? <div style={{ color: sub }}>Sedang proses…</div> : null}
-            {prettyResult ? <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.55 }}>{prettyResult}</pre> : null}
-          </div>
-        </section>
-
-        {/* HISTORY */}
-        <section style={{ marginTop: 12, background: card, border: `1px solid ${border}`, borderRadius: 16, padding: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 900 }}>History</div>
-              <div style={{ fontSize: 12, color: sub }}>Tersimpan di device kamu. Max {MAX_HISTORY} item.</div>
-            </div>
-            <button
-              type="button"
-              onClick={clearHistory}
-              disabled={!history.length}
-              style={{
-                padding: '10px 12px',
-                borderRadius: 999,
-                border: `1px solid ${border}`,
-                background: 'rgba(255,120,120,0.10)',
-                color: text,
-                fontWeight: 900,
-                opacity: history.length ? 1 : 0.6,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Clear all
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
             <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search… (prompt/final/caption/tag)"
-              style={{
-                width: '100%',
-                padding: 10,
-                borderRadius: 12,
-                border: `1px solid ${border}`,
-                background: '#07101f',
-                color: text,
-                outline: 'none',
-              }}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search history…"
+              className="w-full rounded-xl bg-neutral-950/60 p-3 text-sm outline-none ring-1 ring-neutral-800 focus:ring-2 focus:ring-white/40 md:max-w-sm"
             />
-            <select
-              value={filterTag}
-              onChange={(e) => setFilterTag(e.target.value as any)}
-              style={{
-                width: '100%',
-                padding: 10,
-                borderRadius: 12,
-                border: `1px solid ${border}`,
-                background: '#07101f',
-                color: text,
-                outline: 'none',
-              }}
-              title="Filter history by tag"
-            >
-              <option value="all">Filter tag: all</option>
-              {TAGS.map((t) => (
-                <option key={t.key} value={t.key}>
-                  #{t.label}
-                </option>
-              ))}
-            </select>
           </div>
 
-          <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
-            {!filteredHistory.length ? (
-              <div style={{ color: sub }}>Belum ada history.</div>
+          <div className="mt-4 grid gap-3">
+            {filteredSaved.length === 0 ? (
+              <div className="rounded-xl bg-neutral-950/40 p-4 text-sm text-neutral-300 ring-1 ring-neutral-800">
+                Belum ada history.
+              </div>
             ) : (
-              filteredHistory.map((h) => (
-                <div key={h.id} style={{ border: `1px solid ${border}`, background: '#07101f', borderRadius: 14, padding: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
-                    <div style={{ fontWeight: 900 }}>
-                      {presetLabel[h.preset].emoji} {presetLabel[h.preset].title}{' '}
-                      <span style={{ fontSize: 12, color: sub, fontWeight: 700 }}>· {formatDate(h.createdAt)}</span>
+              filteredSaved.map((it) => (
+                <div
+                  key={it.id}
+                  className="rounded-2xl bg-neutral-950/40 p-4 ring-1 ring-neutral-800"
+                >
+                  <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <div className="text-sm font-semibold">{it.title}</div>
+                      <div className="mt-1 text-xs text-neutral-400">
+                        {formatDate(it.createdAt)} • {STYLE_PRESETS[it.preset].label} • {it.tags.join(" / ")}
+                      </div>
                     </div>
-
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <div className="flex flex-wrap gap-2">
                       <button
-                        type="button"
-                        onClick={() => {
-                          setPreset(h.preset);
-                          setPrompt(h.prompt);
-                          setErr('');
-                        }}
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: 999,
-                          border: `1px solid ${border}`,
-                          background: 'rgba(255,255,255,0.06)',
-                          color: text,
-                          fontWeight: 900,
-                        }}
+                        onClick={() => loadItem(it)}
+                        className="rounded-lg bg-white px-3 py-2 text-xs font-medium text-neutral-950 hover:bg-neutral-200"
                       >
-                        Use
+                        Load
                       </button>
-
                       <button
-                        type="button"
-                        onClick={() => onCopyFinal(h.finalPrompt || h.prompt)}
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: 999,
-                          border: `1px solid ${border}`,
-                          background: 'rgba(106,169,255,0.10)',
-                          color: text,
-                          fontWeight: 900,
-                        }}
+                        onClick={() => copy(buildFinalPrompt(it.preset, it.basePrompt, it.extraPrompt), "Saved prompt copied ✅")}
+                        className="rounded-lg bg-neutral-800 px-3 py-2 text-xs hover:bg-neutral-700"
                       >
                         Copy Prompt
                       </button>
-
                       <button
-                        type="button"
-                        onClick={() => onCopyCaption(h.caption || '')}
-                        disabled={!h.caption}
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: 999,
-                          border: `1px solid ${border}`,
-                          background: 'rgba(76,245,219,0.10)',
-                          color: text,
-                          fontWeight: 900,
-                          opacity: h.caption ? 1 : 0.6,
-                        }}
-                      >
-                        Copy Caption
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => removeFromHistory(h.id)}
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: 999,
-                          border: `1px solid ${border}`,
-                          background: 'rgba(255,120,120,0.10)',
-                          color: text,
-                          fontWeight: 900,
-                        }}
+                        onClick={() => deleteItem(it.id)}
+                        className="rounded-lg bg-neutral-800 px-3 py-2 text-xs hover:bg-neutral-700"
                       >
                         Delete
                       </button>
                     </div>
                   </div>
 
-                  {/* item tags editable */}
-                  <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {TAGS.map((t) => {
-                      const on = (h.tags || []).includes(t.key);
-                      return (
-                        <button key={t.key} type="button" style={chip(on)} onClick={() => updateHistoryTags(h.id, t.key)} title="Toggle tag untuk item ini">
-                          #{t.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div style={{ marginTop: 10, fontSize: 12, color: sub, fontWeight: 800 }}>Prompt</div>
-                  <div style={{ fontSize: 13, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{h.prompt}</div>
-
-                  {h.finalPrompt ? (
-                    <>
-                      <div style={{ marginTop: 10, fontSize: 12, color: sub, fontWeight: 800 }}>Final Prompt</div>
-                      <div style={{ fontSize: 13, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{h.finalPrompt}</div>
-                    </>
-                  ) : null}
-
-                  {h.caption ? (
-                    <>
-                      <div style={{ marginTop: 10, fontSize: 12, color: sub, fontWeight: 800 }}>Caption</div>
-                      <div style={{ fontSize: 13, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{h.caption}</div>
-                    </>
-                  ) : null}
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-xs text-neutral-300 hover:text-white">
+                      Lihat detail
+                    </summary>
+                    <div className="mt-2 grid gap-2 md:grid-cols-2">
+                      <div className="rounded-xl bg-neutral-950/60 p-3 text-xs ring-1 ring-neutral-800">
+                        <div className="mb-1 font-semibold text-neutral-200">Base</div>
+                        <div className="whitespace-pre-wrap text-neutral-100">{it.basePrompt}</div>
+                      </div>
+                      <div className="rounded-xl bg-neutral-950/60 p-3 text-xs ring-1 ring-neutral-800">
+                        <div className="mb-1 font-semibold text-neutral-200">Extra</div>
+                        <div className="whitespace-pre-wrap text-neutral-100">{it.extraPrompt}</div>
+                      </div>
+                    </div>
+                  </details>
                 </div>
               ))
             )}
           </div>
         </section>
 
-        <div style={{ height: 28 }} />
-      </main>
-    </div>
+        {/* Toast */}
+        {toast ? (
+          <div className="fixed bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-medium text-neutral-950 shadow">
+            {toast}
+          </div>
+        ) : null}
+
+        <footer className="mt-8 text-center text-xs text-neutral-500">
+          v2 • Build-safe TypeScript • Next.js App Router
+        </footer>
+      </div>
+    </main>
   );
 }
