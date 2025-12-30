@@ -13,18 +13,11 @@ export default function Page() {
   const [copiedJson, setCopiedJson] = useState(false);
   const [copiedFinal, setCopiedFinal] = useState(false);
 
-  const finalSectionRef = useRef<HTMLDivElement | null>(null);
+  const finalRef = useRef<HTMLDivElement | null>(null);
 
-  const exampleByPreset: Record<PresetKey, string> = {
-    sweepy:
-      '@mockey.mo (Sweepy) nonton film horor, sosok di TV makin mendekat, Sweepy gebuk TV pakai remote, suasana lucu tapi tegang',
-    hanz26:
-      '@hanz26 duduk santai seperti UGC, cerita singkat dengan ekspresi natural, vibe relatable, lighting bagus, soft selling halus',
-  };
-
-  const presetLabel: Record<PresetKey, { title: string; sub: string }> = {
-    sweepy: { title: 'Sweepy', sub: '@mockey.mo' },
-    hanz26: { title: '@hanz26', sub: 'AI version' },
+  const presetLabel: Record<PresetKey, { title: string; sub: string; emoji: string }> = {
+    sweepy: { title: 'Sweepy', sub: '@mockey.mo', emoji: '🐵' },
+    hanz26: { title: '@hanz26', sub: 'AI version', emoji: '🧑' },
   };
 
   const canSubmit = prompt.trim().length > 0 && !loading;
@@ -42,6 +35,28 @@ export default function Page() {
     return result?.output?.finalPrompt ? String(result.output.finalPrompt) : '';
   }, [result]);
 
+  function generateAutoPrompt(p: PresetKey) {
+    const variantsSweepy = [
+      'Sweepy (@mockey.mo) di ruang tamu malam hari, suasana tegang ringan, ada kejadian aneh tapi lucu, ekspresi jelas, cinematic lighting, gerakan natural, fokus karakter.',
+      'Sweepy (@mockey.mo) jalan pelan di pinggir sungai mencari ikan kecil, tiba-tiba ada suara dari semak, suasana menegangkan tapi berakhir lucu, cinematic, timing jelas.',
+      'Sweepy (@mockey.mo) duduk santai menonton TV, bayangan di layar makin dekat, Sweepy panik lalu melakukan aksi kocak, tetap cinematic, jelas, tidak terlalu rumit.',
+      'Sweepy (@mockey.mo) membersihkan halaman, tiba-tiba ada benda bergerak sendiri, Sweepy kaget lalu bereaksi lucu, shot rapi, lighting dramatis tapi fun.',
+    ];
+
+    const variantsHanz = [
+      '@hanz26 duduk santai seperti UGC creator, berbicara singkat ke kamera dengan ekspresi natural, vibe relatable, pencahayaan lembut, framing sederhana, engaging.',
+      '@hanz26 berdiri di kamar/ruang kerja, mode UGC, cerita singkat 1 topik, delivery natural, eye contact, lighting bagus, tone hangat, soft selling halus.',
+      '@hanz26 di cafe sederhana, UGC feel, ngomong santai 2-3 kalimat, ekspresi jujur, natural lighting, handheld halus, vibe premium tapi tetap casual.',
+      '@hanz26 di luar ruangan sore hari, UGC vlog style, cerita singkat, gesture natural, audio ambience ringan, lighting hangat, close-up singkat lalu medium shot.',
+    ];
+
+    const list = p === 'sweepy' ? variantsSweepy : variantsHanz;
+
+    // random ringan + aman
+    const idx = Math.floor(Math.random() * list.length);
+    return list[idx];
+  }
+
   async function generateWithText(text: string) {
     const p = text.trim();
     if (!p) {
@@ -50,6 +65,7 @@ export default function Page() {
     }
 
     setErr('');
+    setResult(null);
     setLoading(true);
     setCopiedFinal(false);
     setCopiedJson(false);
@@ -64,18 +80,19 @@ export default function Page() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const msg = data?.error || data?.message || `Request gagal (HTTP ${res.status}).`;
+        const msg =
+          data?.error ||
+          data?.message ||
+          `Request gagal (HTTP ${res.status}). Cek logs Vercel.`;
         throw new Error(msg);
       }
 
       setResult(data);
 
-      // auto scroll ke Final Prompt biar langsung copy-paste
       setTimeout(() => {
-        finalSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 120);
+        finalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
     } catch (e: any) {
-      setResult(null);
       setErr(e?.message || 'Terjadi error.');
     } finally {
       setLoading(false);
@@ -84,23 +101,6 @@ export default function Page() {
 
   async function onGenerate() {
     await generateWithText(prompt);
-  }
-
-  function onUseExampleAuto() {
-    const ex = exampleByPreset[preset];
-    setPrompt(ex);
-    setResult(null);
-    setErr('');
-    // auto-generate
-    generateWithText(ex);
-  }
-
-  function onClear() {
-    setPrompt('');
-    setResult(null);
-    setErr('');
-    setCopiedFinal(false);
-    setCopiedJson(false);
   }
 
   async function onCopyJson() {
@@ -125,14 +125,17 @@ export default function Page() {
     }
   }
 
-  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    // Ctrl/Cmd + Enter untuk generate cepat
-    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
-    const metaOrCtrl = isMac ? e.metaKey : e.ctrlKey;
-    if (metaOrCtrl && e.key === 'Enter') {
-      e.preventDefault();
-      if (canSubmit) onGenerate();
-    }
+  function onAutoGenerate() {
+    if (loading) return;
+    const auto = generateAutoPrompt(preset);
+    setPrompt(auto);
+    setErr('');
+    generateWithText(auto);
+  }
+
+  function onClear() {
+    setPrompt('');
+    setErr('');
   }
 
   const S = styles;
@@ -158,32 +161,28 @@ export default function Page() {
           </div>
         </header>
 
-        {/* Prompt Card */}
+        {/* Card: Prompt */}
         <section style={S.card}>
           <div style={S.cardHead}>
             <div>
               <div style={S.cardTitle}>Prompt</div>
               <div style={S.cardHint}>
-                Pilih preset karakter, lalu tulis ide singkat. Klik <b>Pakai contoh</b> untuk isi + generate otomatis.
+                Pilih preset karakter, lalu tulis ide singkat. Atau tekan “Pakai contoh” untuk auto-generate ide + langsung generate finalPrompt.
               </div>
             </div>
 
             <button
               type="button"
-              style={{
-                ...S.smallBtn,
-                opacity: loading ? 0.6 : 1,
-                cursor: loading ? 'not-allowed' : 'pointer',
-              }}
-              onClick={onUseExampleAuto}
+              style={{ ...S.smallBtn, opacity: loading ? 0.6 : 1 }}
+              onClick={onAutoGenerate}
               disabled={loading}
-              title="Isi contoh + generate otomatis"
+              title="Auto generate prompt + generate otomatis"
             >
               {loading ? 'Generating…' : 'Pakai contoh'}
             </button>
           </div>
 
-          {/* Preset Toggle */}
+          {/* Preset toggle */}
           <div style={S.presetRow}>
             {(['sweepy', 'hanz26'] as PresetKey[]).map((k) => {
               const active = preset === k;
@@ -195,12 +194,15 @@ export default function Page() {
                   disabled={loading}
                   style={{
                     ...S.presetBtn,
-                    ...(active ? S.presetBtnActive : undefined),
+                    ...(active ? S.presetBtnActive : null),
                     opacity: loading ? 0.75 : 1,
                     cursor: loading ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  <div style={S.presetTitle}>{presetLabel[k].title}</div>
+                  <div style={S.presetTop}>
+                    <span style={S.presetEmoji}>{presetLabel[k].emoji}</span>
+                    <span style={S.presetTitle}>{presetLabel[k].title}</span>
+                  </div>
                   <div style={S.presetSub}>{presetLabel[k].sub}</div>
                 </button>
               );
@@ -214,17 +216,18 @@ export default function Page() {
               setPrompt(e.target.value);
               if (err) setErr('');
             }}
-            onKeyDown={onKeyDown}
-            placeholder={`Contoh:\n"${exampleByPreset[preset]}"\n\nTip: Ctrl/⌘ + Enter untuk Generate`}
+            placeholder="Tulis ide singkat… atau tekan “Pakai contoh” untuk auto-generate."
             rows={7}
           />
 
           <div style={S.miniRow}>
-            <div style={S.miniText}>
-              Preset aktif:{' '}
-              <span style={S.miniStrong}>
-                {presetLabel[preset].title} ({presetLabel[preset].sub})
-              </span>
+            <div style={S.miniLeft}>
+              <div style={S.miniText}>
+                Preset aktif:{' '}
+                <span style={S.miniStrong}>
+                  {preset === 'sweepy' ? 'Sweepy (@mockey.mo)' : '@hanz26 (AI version)'}
+                </span>
+              </div>
             </div>
 
             <div style={S.miniRight}>
@@ -270,8 +273,8 @@ export default function Page() {
           </div>
         </section>
 
-        {/* Final Prompt */}
-        <section style={S.card} ref={finalSectionRef}>
+        {/* Card: Final Prompt */}
+        <section style={S.card} ref={finalRef}>
           <div style={S.cardHead}>
             <div>
               <div style={S.cardTitle}>Final Prompt (Copy ke Sora)</div>
@@ -293,18 +296,18 @@ export default function Page() {
           </div>
 
           <div style={S.resultBox}>
-            {!finalPrompt && !loading ? <div style={S.emptyState}>Belum ada hasil. Tekan Generate dulu.</div> : null}
+            {!finalPrompt && !loading ? <div style={S.emptyState}>Belum ada hasil. Tekan Generate atau “Pakai contoh”.</div> : null}
             {loading ? <div style={S.loadingState}>Sedang proses…</div> : null}
             {finalPrompt ? <pre style={S.pre}>{finalPrompt}</pre> : null}
           </div>
         </section>
 
-        {/* JSON */}
+        {/* Card: Response JSON */}
         <section style={S.card}>
           <div style={S.cardHead}>
             <div>
               <div style={S.cardTitle}>Response (JSON)</div>
-              <div style={S.cardHint}>Kalau mau edit/inspect storyboard, copy JSON-nya.</div>
+              <div style={S.cardHint}>Kalau mau inspect storyboard, copy JSON-nya.</div>
             </div>
 
             <button
@@ -334,11 +337,11 @@ export default function Page() {
           </div>
 
           <div style={S.footerNote}>
-            Tips: buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup. Generate beneran pakai POST.
+            Tips: untuk test endpoint di browser, buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup. Generate beneran pakai POST.
           </div>
         </section>
 
-        <div style={{ height: 12 }} />
+        <div style={S.bottomPad} />
       </main>
     </div>
   );
@@ -363,9 +366,19 @@ const styles: Record<string, React.CSSProperties> = {
     filter: 'blur(6px)',
     pointerEvents: 'none',
   },
-  container: { maxWidth: 860, margin: '0 auto', position: 'relative' },
-  header: { marginBottom: 14 },
-  brandRow: { display: 'flex', gap: 12, alignItems: 'center' },
+  container: {
+    maxWidth: 860,
+    margin: '0 auto',
+    position: 'relative',
+  },
+  header: {
+    marginBottom: 14,
+  },
+  brandRow: {
+    display: 'flex',
+    gap: 12,
+    alignItems: 'center',
+  },
   logoDot: {
     width: 14,
     height: 14,
@@ -374,10 +387,24 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 0 24px rgba(76,245,219,0.28)',
     flexShrink: 0,
   },
-  title: { margin: 0, fontSize: 34, letterSpacing: 1.2, lineHeight: 1.05, fontWeight: 800 },
-  subtitle: { margin: '6px 0 0', opacity: 0.72, fontSize: 14 },
-
-  badgeRow: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 },
+  title: {
+    margin: 0,
+    fontSize: 34,
+    letterSpacing: 1.2,
+    lineHeight: 1.05,
+    fontWeight: 800,
+  },
+  subtitle: {
+    margin: '6px 0 0',
+    opacity: 0.72,
+    fontSize: 14,
+  },
+  badgeRow: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginTop: 10,
+  },
   badge: {
     fontSize: 12,
     padding: '6px 10px',
@@ -386,7 +413,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,255,255,0.10)',
     opacity: 0.9,
   },
-
   card: {
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.10)',
@@ -404,10 +430,23 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'flex-start',
     marginBottom: 12,
   },
-  cardTitle: { fontSize: 16, fontWeight: 800, marginBottom: 4 },
-  cardHint: { fontSize: 12, opacity: 0.72, lineHeight: 1.35, maxWidth: 560 },
-
-  presetRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: 800,
+    marginBottom: 4,
+  },
+  cardHint: {
+    fontSize: 12,
+    opacity: 0.72,
+    lineHeight: 1.35,
+    maxWidth: 560,
+  },
+  presetRow: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 10,
+    marginBottom: 12,
+  },
   presetBtn: {
     textAlign: 'left',
     padding: 12,
@@ -421,9 +460,24 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'linear-gradient(90deg, rgba(76,245,219,0.18), rgba(106,169,255,0.12))',
     boxShadow: '0 10px 24px rgba(0,0,0,0.22)',
   },
-  presetTitle: { fontWeight: 900, fontSize: 15, letterSpacing: 0.2, marginBottom: 6 },
-  presetSub: { fontSize: 12, opacity: 0.78 },
-
+  presetTop: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 6,
+  },
+  presetEmoji: {
+    fontSize: 18,
+  },
+  presetTitle: {
+    fontWeight: 900,
+    fontSize: 15,
+    letterSpacing: 0.2,
+  },
+  presetSub: {
+    fontSize: 12,
+    opacity: 0.78,
+  },
   textarea: {
     width: '100%',
     resize: 'vertical',
@@ -438,7 +492,6 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.55,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
   },
-
   miniRow: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -447,9 +500,10 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 10,
     flexWrap: 'wrap',
   },
+  miniLeft: { flex: 1 },
+  miniRight: { display: 'flex', alignItems: 'center', gap: 10 },
   miniText: { fontSize: 12, opacity: 0.78 },
   miniStrong: { fontWeight: 800, opacity: 1 },
-  miniRight: { display: 'flex', alignItems: 'center', gap: 10 },
   charCount: { fontSize: 12, opacity: 0.78 },
   linkBtn: {
     background: 'transparent',
@@ -458,7 +512,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 800,
     padding: 6,
   },
-
   actionsRow: {
     display: 'flex',
     gap: 12,
@@ -479,7 +532,6 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 360,
     boxShadow: '0 10px 24px rgba(0,0,0,0.25)',
   },
-
   smallBtn: {
     padding: '10px 12px',
     borderRadius: 999,
@@ -490,9 +542,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     whiteSpace: 'nowrap',
   },
-
-  metaRight: { flex: 1, minWidth: 220 },
-  metaLine: { fontSize: 12, opacity: 0.75, marginTop: 4 },
+  metaRight: {
+    flex: 1,
+    minWidth: 220,
+  },
+  metaLine: {
+    fontSize: 12,
+    opacity: 0.75,
+    marginTop: 4,
+  },
   code: {
     fontSize: 12,
     padding: '2px 6px',
@@ -500,8 +558,12 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(255,255,255,0.07)',
     border: '1px solid rgba(255,255,255,0.10)',
   },
-  errorText: { marginTop: 8, fontSize: 12, color: 'rgba(255,120,120,0.95)', fontWeight: 900 },
-
+  errorText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: 'rgba(255,120,120,0.95)',
+    fontWeight: 900,
+  },
   resultBox: {
     background: 'rgba(0,0,0,0.35)',
     border: '1px solid rgba(255,255,255,0.10)',
@@ -518,9 +580,14 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.6,
     color: 'rgba(255,255,255,0.92)',
   },
-  emptyState: { fontSize: 13, opacity: 0.65 },
-  loadingState: { fontSize: 13, opacity: 0.85 },
-
+  emptyState: {
+    fontSize: 13,
+    opacity: 0.65,
+  },
+  loadingState: {
+    fontSize: 13,
+    opacity: 0.85,
+  },
   errorBox: {
     marginTop: 10,
     padding: 10,
@@ -528,8 +595,20 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,120,120,0.35)',
     background: 'rgba(255,120,120,0.08)',
   },
-  errorTitle: { fontWeight: 900, fontSize: 13, marginBottom: 4 },
-  errorMsg: { fontSize: 12, opacity: 0.9 },
-
-  footerNote: { marginTop: 10, fontSize: 12, opacity: 0.7, lineHeight: 1.4 },
+  errorTitle: {
+    fontWeight: 900,
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  errorMsg: {
+    fontSize: 12,
+    opacity: 0.9,
+  },
+  footerNote: {
+    marginTop: 10,
+    fontSize: 12,
+    opacity: 0.7,
+    lineHeight: 1.4,
+  },
+  bottomPad: { height: 12 },
 };
