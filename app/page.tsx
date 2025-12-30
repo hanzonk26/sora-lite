@@ -50,7 +50,6 @@ export default function Page() {
     }
 
     setErr('');
-    setResult(null);
     setLoading(true);
     setCopiedFinal(false);
     setCopiedJson(false);
@@ -65,19 +64,18 @@ export default function Page() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const msg =
-          data?.error ||
-          data?.message ||
-          `Request gagal (HTTP ${res.status}).`;
+        const msg = data?.error || data?.message || `Request gagal (HTTP ${res.status}).`;
         throw new Error(msg);
       }
 
       setResult(data);
 
+      // auto scroll ke Final Prompt biar langsung copy-paste
       setTimeout(() => {
         finalSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 150);
+      }, 120);
     } catch (e: any) {
+      setResult(null);
       setErr(e?.message || 'Terjadi error.');
     } finally {
       setLoading(false);
@@ -86,6 +84,23 @@ export default function Page() {
 
   async function onGenerate() {
     await generateWithText(prompt);
+  }
+
+  function onUseExampleAuto() {
+    const ex = exampleByPreset[preset];
+    setPrompt(ex);
+    setResult(null);
+    setErr('');
+    // auto-generate
+    generateWithText(ex);
+  }
+
+  function onClear() {
+    setPrompt('');
+    setResult(null);
+    setErr('');
+    setCopiedFinal(false);
+    setCopiedJson(false);
   }
 
   async function onCopyJson() {
@@ -110,16 +125,14 @@ export default function Page() {
     }
   }
 
-  function onUseExampleAuto() {
-    const ex = exampleByPreset[preset];
-    setPrompt(ex);
-    setErr('');
-    generateWithText(ex);
-  }
-
-  function onClear() {
-    setPrompt('');
-    setErr('');
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Ctrl/Cmd + Enter untuk generate cepat
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
+    const metaOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+    if (metaOrCtrl && e.key === 'Enter') {
+      e.preventDefault();
+      if (canSubmit) onGenerate();
+    }
   }
 
   const S = styles;
@@ -151,13 +164,17 @@ export default function Page() {
             <div>
               <div style={S.cardTitle}>Prompt</div>
               <div style={S.cardHint}>
-                Pilih preset karakter, lalu tulis ide singkat. Sistem akan buat storyboard + finalPrompt untuk kamu paste ke Sora.
+                Pilih preset karakter, lalu tulis ide singkat. Klik <b>Pakai contoh</b> untuk isi + generate otomatis.
               </div>
             </div>
 
             <button
               type="button"
-              style={{ ...S.smallBtn, opacity: loading ? 0.6 : 1 }}
+              style={{
+                ...S.smallBtn,
+                opacity: loading ? 0.6 : 1,
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
               onClick={onUseExampleAuto}
               disabled={loading}
               title="Isi contoh + generate otomatis"
@@ -180,6 +197,7 @@ export default function Page() {
                     ...S.presetBtn,
                     ...(active ? S.presetBtnActive : undefined),
                     opacity: loading ? 0.75 : 1,
+                    cursor: loading ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <div style={S.presetTitle}>{presetLabel[k].title}</div>
@@ -196,13 +214,17 @@ export default function Page() {
               setPrompt(e.target.value);
               if (err) setErr('');
             }}
-            placeholder={`Contoh:\n"${exampleByPreset[preset]}"`}
+            onKeyDown={onKeyDown}
+            placeholder={`Contoh:\n"${exampleByPreset[preset]}"\n\nTip: Ctrl/⌘ + Enter untuk Generate`}
             rows={7}
           />
 
           <div style={S.miniRow}>
             <div style={S.miniText}>
-              Preset aktif: <span style={S.miniStrong}>{presetLabel[preset].title} ({presetLabel[preset].sub})</span>
+              Preset aktif:{' '}
+              <span style={S.miniStrong}>
+                {presetLabel[preset].title} ({presetLabel[preset].sub})
+              </span>
             </div>
 
             <div style={S.miniRight}>
@@ -248,7 +270,7 @@ export default function Page() {
           </div>
         </section>
 
-        {/* Final Prompt Card */}
+        {/* Final Prompt */}
         <section style={S.card} ref={finalSectionRef}>
           <div style={S.cardHead}>
             <div>
@@ -277,7 +299,7 @@ export default function Page() {
           </div>
         </section>
 
-        {/* JSON Card */}
+        {/* JSON */}
         <section style={S.card}>
           <div style={S.cardHead}>
             <div>
@@ -312,8 +334,7 @@ export default function Page() {
           </div>
 
           <div style={S.footerNote}>
-            Tips: untuk test endpoint di browser, buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup.
-            Generate beneran pakai POST dari tombol.
+            Tips: buka <code style={S.code}>/api/generate</code> (GET) cuma untuk cek hidup. Generate beneran pakai POST.
           </div>
         </section>
 
