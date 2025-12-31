@@ -1,579 +1,596 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
-type StyleKey =
-  | 'cinematic'
-  | 'horror'
-  | 'funny'
-  | 'ugc'
-  | 'doc'
-  | 'broll'
-  | 'weird'
-  | 'sweepy'
-  | 'hanz';
-
-type NicheKey = 'general' | 'health' | 'fitness' | 'skincare' | 'food' | 'review';
-
-type TagKey = 'horror' | 'daily' | 'review' | 'lucu';
+type PresetKey = 'general' | 'sweepy' | 'hanz';
+type NicheKey = 'daily' | 'lucu' | 'kesehatan' | 'ugc' | 'horror';
 
 type HistoryItem = {
   id: string;
   ts: number;
-  style: StyleKey;
+  preset: PresetKey;
   niche: NicheKey;
-  tags: TagKey[];
-  prompt: string;
+  main: string;
   extra: string;
   finalPrompt: string;
   caption: string;
   hashtags: string[];
 };
 
-const STYLE_PRESETS: Record<StyleKey, { label: string; detail: string }> = {
-  cinematic: {
-    label: 'Cinematic',
-    detail:
-      'cinematic film look, high contrast, soft film grain, shallow depth of field, smooth dolly moves, dramatic lighting, professional color grading',
-  },
-  horror: {
-    label: 'Horror',
-    detail:
-      'cinematic horror, low-key lighting, eerie shadows, subtle camera shake, suspense pacing, cold color temperature, creepy ambience (NO gore, NO extreme)',
-  },
-  funny: {
-    label: 'Lucu',
-    detail:
-      'playful comedy tone, lighthearted pacing, expressive motion, humorous beats, bright friendly lighting, quick punchy cuts',
-  },
-  ugc: {
-    label: 'UGC',
-    detail:
-      'UGC smartphone look, natural lighting, handheld, casual authentic vibe, minimal color grading, realistic imperfections',
-  },
-  doc: {
-    label: 'Doc',
-    detail:
-      'documentary style, observational camera, realistic lighting, steady handheld, natural sound vibe, informative framing',
-  },
-  broll: {
-    label: 'B-roll (No Character)',
-    detail:
-      'beautiful b-roll, no character, product/environment focused, clean compositions, smooth camera moves, natural light, atmospheric',
-  },
-  weird: {
-    label: 'Weird / Random',
-    detail:
-      'absurd surreal concept, unexpected props, odd but cinematic, playful visual twist, unique transitions, viral pacing',
-  },
-  sweepy: {
-    label: 'Sweepy 🧹',
-    detail:
-      'cute quirky mascot character named Sweepy, playful cleanup hero vibe, expressive motion, fun camera angles, short viral pacing, realistic lighting',
-  },
-  hanz: {
-    label: 'Hanz 👤',
-    detail:
-      'UGC presenter character Hanz, confident friendly tone, clear gestures, natural face expressions, camera to subject, engaging pacing',
-  },
+type SavedItem = {
+  id: string;
+  name: string;
+  ts: number;
+  data: HistoryItem;
 };
 
-const NICHE_PRESETS: Record<NicheKey, { label: string; hint: string; hashtags: string[] }> = {
-  general: {
-    label: 'General',
-    hint: 'tema umum, hiburan, viral, storytelling',
-    hashtags: ['#konten', '#viral', '#fyp', '#idekonten', '#ai'],
-  },
-  health: {
-    label: 'Health',
-    hint: 'tips kesehatan, kebiasaan sehat, edukasi ringan',
-    hashtags: ['#kesehatan', '#hidupsehat', '#tipssehat', '#wellness', '#aicontent'],
-  },
-  fitness: {
-    label: 'Fitness',
-    hint: 'gym, workout, pembentukan tubuh, motivasi',
-    hashtags: ['#fitness', '#workout', '#gym', '#fitlife', '#healthylifestyle'],
-  },
-  skincare: {
-    label: 'Skincare',
-    hint: 'perawatan kulit, review skincare, rutinitas',
-    hashtags: ['#skincare', '#glowup', '#rutinwajah', '#beauty', '#review'],
-  },
-  food: {
-    label: 'Food',
-    hint: 'makanan, minuman sehat, resep singkat',
-    hashtags: ['#kuliner', '#makanansehat', '#foodie', '#resep', '#healthyfood'],
-  },
-  review: {
-    label: 'Review',
-    hint: 'review produk, before-after, pro-kontra, soft selling',
-    hashtags: ['#review', '#rekomendasi', '#unboxing', '#productreview', '#fyp'],
-  },
+const LS_HISTORY_KEY = 'sora_lite_history_v4';
+const LS_SAVED_KEY = 'sora_lite_saved_v4';
+
+const PRESET_LABEL: Record<PresetKey, string> = {
+  general: 'General',
+  sweepy: 'Sweepy 🧹',
+  hanz: 'Hanz 👤',
 };
 
-const TAGS: { key: TagKey; label: string }[] = [
-  { key: 'horror', label: 'horror' },
-  { key: 'daily', label: 'daily' },
-  { key: 'review', label: 'review' },
-  { key: 'lucu', label: 'lucu' },
+const NICHE_LABEL: Record<NicheKey, string> = {
+  daily: 'Daily',
+  lucu: 'Lucu',
+  kesehatan: 'Kesehatan',
+  ugc: 'UGC',
+  horror: 'Horror',
+};
+
+const PRESET_TEXT: Record<PresetKey, string> = {
+  general:
+    'no specific character, natural everyday scene, realistic details, clean composition, mobile-friendly framing',
+  sweepy:
+    'cute quirky mascot character named Sweepy, expressive motion, playful cleanup hero vibe, fun camera angles, short viral pacing, friendly comedic beats',
+  hanz:
+    'UGC presenter character Hanz, confident friendly tone, clear gestures, natural face expressions, camera-to-subject, engaging pacing, casual streetwear vibe',
+};
+
+const NICHE_GUIDE: Record<NicheKey, string> = {
+  daily: 'daily relatable moment, simple premise, easy to repost, conversational vibe, quick hook in first 2 seconds',
+  lucu: 'comedic timing, light slapstick, unexpected twist, reaction moments, keep it family-friendly',
+  kesehatan:
+    'health & wellness niche, practical tips, positive tone, simple education, avoid medical claims, focus on habits and lifestyle',
+  ugc: 'UGC style, handheld phone feel, direct-to-camera, authentic, minimal cinematic effects, product-friendly framing',
+  horror:
+    'cinematic horror vibe but safe, suspense build-up, eerie ambience, NO extreme gore, keep it playful or surprising if needed',
+};
+
+// Pool ide random per niche (Auto Generate akan TIDAK mengubah niche user)
+const IDEAS: Array<{ niche: NicheKey; main: string; extra?: string }> = [
+  // DAILY
+  {
+    niche: 'daily',
+    main: 'Seorang karakter sedang siap-siap pergi, tapi tiap kali mau keluar selalu ada hal kecil yang bikin balik lagi (kunci, dompet, charger). Akhirnya sadar semua sudah di tangan.',
+    extra: 'handheld phone feel, quick cuts, comedic beat at the end',
+  },
+  {
+    niche: 'daily',
+    main: 'Momen “sebelum vs sesudah” beres-beres kamar dalam 10 detik, dibuat timelapse yang satisfying.',
+    extra: 'timelapse, satisfying cleanup, soft lighting',
+  },
+
+  // LUCU
+  {
+    niche: 'lucu',
+    main: 'Sweepy/Hanz mencoba bikin konten serius, tapi selalu ada gangguan absurd kecil (kipas angin, kucing, suara tetangga) sampai akhirnya menyerah dan ketawa.',
+    extra: 'reaction shots, punchline ending',
+  },
+  {
+    niche: 'lucu',
+    main: 'Karakter memberi tutorial singkat, tapi tiap langkah muncul “versi dramatis” yang lebay lalu kembali normal.',
+    extra: 'split-second comedic cutaways, captions on screen',
+  },
+
+  // KESEHATAN
+  {
+    niche: 'kesehatan',
+    main: 'Tips 3 kebiasaan sehat yang gampang: minum air, jalan 10 menit, tidur lebih cepat 30 menit. Ditampilkan dengan visual simpel dan jelas.',
+    extra: 'clean overlays, friendly tone, calm pacing',
+  },
+  {
+    niche: 'kesehatan',
+    main: 'Konten “kesalahan kecil setelah makan berat” dan solusi ringan: jalan pelan 5–10 menit + minum air.',
+    extra: 'UGC talk-to-camera + b-roll sederhana',
+  },
+
+  // UGC
+  {
+    niche: 'ugc',
+    main: 'Review singkat: “yang aku suka / yang perlu kamu tahu” dengan 3 poin cepat. Fokus gesture tangan dan close-up detail.',
+    extra: 'phone camera, natural light, product-friendly shots',
+  },
+  {
+    niche: 'ugc',
+    main: 'Hook: “kalau kamu baru mulai…, ini cara paling gampang”. Lalu tunjukkan step-by-step super singkat.',
+    extra: 'quick subtitles, simple framing',
+  },
+
+  // HORROR (aman)
+  {
+    niche: 'horror',
+    main: 'Suasana rumah malam hari, terdengar bunyi pelan dari arah dapur. Kamera pelan mendekat—ternyata cuma botol jatuh. Karakter menghela napas lalu ketawa.',
+    extra: 'eerie ambience, low-key lighting, no gore',
+  },
+  {
+    niche: 'horror',
+    main: 'Karakter nonton film horor, bayangan di TV seperti mau keluar… tapi karakter “mengetok” kepala pakai remote, bayangan mundur lagi (komedi horor).',
+    extra: 'cinematic horror + funny beat, safe, no gore',
+  },
 ];
 
 function uid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
-function clampText(s: string) {
-  return s.replace(/\s+/g, ' ').trim();
+function clampList<T>(arr: T[], max: number) {
+  if (arr.length <= max) return arr;
+  return arr.slice(0, max);
 }
 
-function buildHashtags(niche: NicheKey, tags: TagKey[]): string[] {
-  const base = NICHE_PRESETS[niche].hashtags;
-  const extra: string[] = [];
+function buildFinalPrompt(preset: PresetKey, niche: NicheKey, main: string, extra: string) {
+  const parts: string[] = [];
+  parts.push(PRESET_TEXT[preset]);
+  parts.push(NICHE_GUIDE[niche]);
+  parts.push(main.trim());
 
-  // map tags to a couple of hashtags
-  for (const t of tags) {
-    if (t === 'horror') extra.push('#horor');
-    if (t === 'daily') extra.push('#dailycontent');
-    if (t === 'review') extra.push('#reviewjujur');
-    if (t === 'lucu') extra.push('#lucu');
-  }
+  if (extra.trim()) parts.push(extra.trim());
 
-  // ensure unique & take 5
-  const all = [...base, ...extra];
-  const uniq = Array.from(new Set(all));
-  return uniq.slice(0, 5);
+  // “Sora-friendly” finishing touches
+  parts.push(
+    '10–15 seconds, strong opening hook, clear subject, clean background, readable composition, natural motion, avoid text-heavy scenes'
+  );
+
+  return parts.filter(Boolean).join(', ');
 }
 
-function buildCaption(style: StyleKey, niche: NicheKey, tags: TagKey[], main: string, finalPrompt: string) {
-  const tagLine = tags.length ? tags.map((t) => `#${t}`).join(' ') : '#daily';
-  const nicheLabel = NICHE_PRESETS[niche].label;
+function buildCaption(preset: PresetKey, niche: NicheKey, main: string) {
+  const base =
+    niche === 'kesehatan'
+      ? 'Tips simpel yang kepake banget 🌿'
+      : niche === 'lucu'
+        ? 'Biar hari kamu ketawa dikit 😄'
+        : niche === 'horror'
+          ? 'Berani nonton sampai habis? 👀'
+          : niche === 'ugc'
+            ? 'Jujur ini yang paling kepake ✅'
+            : 'Momen sehari-hari yang relatable ✨';
 
-  // Keep it simple and mobile friendly (2–3 lines)
-  const topic =
-    clampText(main).slice(0, 72) ||
-    clampText(finalPrompt).slice(0, 72) ||
-    'Ide konten cepat dan simpel';
+  const who =
+    preset === 'hanz' ? 'Bareng Hanz.' : preset === 'sweepy' ? 'Bareng Sweepy.' : '';
 
-  const styleLabel = STYLE_PRESETS[style].label;
+  // potong main biar jadi “teaser”
+  const teaser = main.trim().length > 90 ? main.trim().slice(0, 90).trim() + '…' : main.trim();
 
-  return `(${nicheLabel} • ${styleLabel}) ${topic}\n\n${tagLine} — mau versi lain?`;
+  return `${base} ${who}\n${teaser}`;
 }
 
-function composePrompt(style: StyleKey, niche: NicheKey, main: string, extra: string) {
-  const styleText = STYLE_PRESETS[style].detail;
-  const nicheText = NICHE_PRESETS[niche].hint;
+function buildHashtags(preset: PresetKey, niche: NicheKey) {
+  const core = ['#sora', '#ai', '#aivideo'];
+  const byNiche: Record<NicheKey, string[]> = {
+    daily: ['#dailycontent', '#relatable', '#fyp'],
+    lucu: ['#lucu', '#komedi', '#viral'],
+    kesehatan: ['#kesehatan', '#hidupsehat', '#wellness'],
+    ugc: ['#ugc', '#review', '#contentcreator'],
+    horror: ['#horror', '#misteri', '#seram'],
+  };
 
-  const blocks: string[] = [];
-  blocks.push(styleText);
-  blocks.push(`niche: ${nicheText}`);
+  const byPreset =
+    preset === 'hanz' ? ['#hanz'] : preset === 'sweepy' ? ['#sweepy'] : ['#broll'];
 
-  if (main.trim()) blocks.push(`scene: ${clampText(main)}`);
-  if (extra.trim()) blocks.push(`extra: ${clampText(extra)}`);
+  const all = [...core, ...byNiche[niche], ...byPreset];
 
-  // final assembly
-  return blocks.join(', ');
+  // pastikan max 5 (sesuai request)
+  return all.slice(0, 5);
 }
-
-// Random idea generator (safe / no extreme)
-const RANDOM_IDEAS: { niche: NicheKey; main: string; extra?: string }[] = [
-  { niche: 'health', main: '3 kebiasaan kecil yang bikin badan terasa lebih ringan setiap pagi', extra: 'UGC, 10–15 detik, overlay teks poin-poin' },
-  { niche: 'fitness', main: 'workout 20 detik: 3 gerakan pemula tanpa alat di rumah', extra: 'kamera handheld, energik, jelas' },
-  { niche: 'skincare', main: 'rutinitas malam singkat: bersih-bersih wajah + 1 produk utama, sebelum tidur', extra: 'close-up, soft lighting' },
-  { niche: 'review', main: 'review jujur produk: 1 kelebihan, 1 kekurangan, siapa yang cocok', extra: 'soft selling, call-to-action halus' },
-  { niche: 'food', main: 'minuman sehat 15 detik: campur 3 bahan sederhana, hasilnya segar', extra: 'b-roll bahan + teks' },
-  { niche: 'general', main: 'konten viral: “yang orang sering salah paham” versi lucu dan cepat', extra: 'pacing cepat, punchline di akhir' },
-];
-
-const STORAGE_KEY = 'sora_lite_history_v3';
 
 export default function Page() {
-  const [style, setStyle] = useState<StyleKey>('cinematic');
-  const [niche, setNiche] = useState<NicheKey>('general'); // ✅ NICHE SELALU BEBAS DIPILIH
-  const [tags, setTags] = useState<TagKey[]>(['daily']);
+  const [preset, setPreset] = useState<PresetKey>('general');
+  const [niche, setNiche] = useState<NicheKey>('daily');
+
   const [main, setMain] = useState('');
   const [extra, setExtra] = useState('');
+
+  const [toast, setToast] = useState<string>('');
+
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [toast, setToast] = useState<string | null>(null);
+  const [saved, setSaved] = useState<SavedItem[]>([]);
 
-  const toastTimer = useRef<number | null>(null);
-
-  function showToast(msg: string) {
-    setToast(msg);
-    if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), 1600);
-  }
-
+  // Load localStorage
   useEffect(() => {
-    // load history
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as HistoryItem[];
-      if (Array.isArray(parsed)) setHistory(parsed);
+      const rawH = localStorage.getItem(LS_HISTORY_KEY);
+      const rawS = localStorage.getItem(LS_SAVED_KEY);
+      if (rawH) setHistory(JSON.parse(rawH));
+      if (rawS) setSaved(JSON.parse(rawS));
     } catch {
       // ignore
     }
   }, []);
 
+  // Save history
   useEffect(() => {
-    // save history
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, 50)));
+      localStorage.setItem(LS_HISTORY_KEY, JSON.stringify(history));
     } catch {
       // ignore
     }
   }, [history]);
 
-  // ✅ IMPORTANT: Tidak ada useEffect yang mengubah niche berdasarkan style.
-  // Jadi Sweepy/Hanz tidak akan pernah “mengunci” Niche.
+  // Save saved list
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_SAVED_KEY, JSON.stringify(saved));
+    } catch {
+      // ignore
+    }
+  }, [saved]);
 
-  const finalPrompt = useMemo(() => composePrompt(style, niche, main, extra), [style, niche, main, extra]);
+  // Toast auto hide
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(''), 1600);
+    return () => clearTimeout(t);
+  }, [toast]);
 
-  const captionBlock = useMemo(() => {
-    const cap = buildCaption(style, niche, tags, main, finalPrompt);
-    const hash = buildHashtags(niche, tags).join(' ');
-    return `${cap}\n\n${hash}`;
-  }, [style, niche, tags, main, finalPrompt]);
+  const finalPrompt = useMemo(() => {
+    if (!main.trim()) return '';
+    return buildFinalPrompt(preset, niche, main, extra);
+  }, [preset, niche, main, extra]);
 
-  const activeStyleDetail = STYLE_PRESETS[style].detail;
+  const caption = useMemo(() => {
+    if (!main.trim()) return '';
+    return buildCaption(preset, niche, main);
+  }, [preset, niche, main]);
 
-  function toggleTag(t: TagKey) {
-    setTags((prev) => {
-      const has = prev.includes(t);
-      const next = has ? prev.filter((x) => x !== t) : [...prev, t];
-      return next.length ? next : (['daily'] as TagKey[]);
-    });
+  const hashtags = useMemo(() => buildHashtags(preset, niche), [preset, niche]);
+
+  const captionWithHashtags = useMemo(() => {
+    if (!caption) return '';
+    return `${caption}\n\n${hashtags.join(' ')}`;
+  }, [caption, hashtags]);
+
+  function pushHistory() {
+    if (!finalPrompt.trim()) return;
+
+    const item: HistoryItem = {
+      id: uid(),
+      ts: Date.now(),
+      preset,
+      niche,
+      main: main.trim(),
+      extra: extra.trim(),
+      finalPrompt,
+      caption,
+      hashtags,
+    };
+
+    setHistory((prev) => clampList([item, ...prev], 30));
   }
 
-  async function copyText(text: string) {
+  async function copyText(text: string, okMsg: string) {
+    if (!text.trim()) return;
     try {
       await navigator.clipboard.writeText(text);
-      showToast('Copied ✅');
+      setToast(okMsg);
     } catch {
-      showToast('Gagal copy (izin clipboard) ❌');
+      // fallback (old browser)
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setToast(okMsg);
     }
   }
 
   function clearAll() {
+    setPreset('general');
+    setNiche('daily');
     setMain('');
     setExtra('');
-    setTags(['daily']);
-    setStyle('cinematic');
-    // ✅ niche tidak harus di-reset, tapi kita set ke general supaya konsisten
-    setNiche('general');
-    showToast('Reset done');
+    setToast('Cleared');
   }
 
   function autoGenerate() {
-    const pick = RANDOM_IDEAS[Math.floor(Math.random() * RANDOM_IDEAS.length)];
+    // ✅ niche tidak berubah — hanya pilih ide yang sesuai niche saat ini
+    const pool = IDEAS.filter((x) => x.niche === niche);
+    const usePool = pool.length ? pool : IDEAS;
+    const pick = usePool[Math.floor(Math.random() * usePool.length)];
+
     setMain(pick.main);
     setExtra(pick.extra ?? '');
-    setNiche(pick.niche);
-    showToast('Auto generated ✨');
+    setToast('Auto generated ✨');
   }
 
-  function saveToHistory() {
+  function saveCurrent() {
+    if (!finalPrompt.trim()) {
+      setToast('Isi prompt utama dulu');
+      return;
+    }
+
+    const name = window.prompt('Nama preset/saved prompt (contoh: "Hanz - Tips Sehat")');
+    if (!name) return;
+
     const item: HistoryItem = {
       id: uid(),
       ts: Date.now(),
-      style,
+      preset,
       niche,
-      tags,
-      prompt: main,
-      extra,
+      main: main.trim(),
+      extra: extra.trim(),
       finalPrompt,
-      caption: captionBlock,
-      hashtags: buildHashtags(niche, tags),
+      caption,
+      hashtags,
     };
-    setHistory((prev) => [item, ...prev].slice(0, 50));
-    showToast('Saved to history');
+
+    const savedItem: SavedItem = { id: uid(), name, ts: Date.now(), data: item };
+    setSaved((prev) => clampList([savedItem, ...prev], 30));
+    setToast('Saved ✅');
   }
 
-  function applyHistory(item: HistoryItem) {
-    setStyle(item.style);
-    setNiche(item.niche);
-    setTags(item.tags.length ? item.tags : (['daily'] as TagKey[]));
-    setMain(item.prompt);
-    setExtra(item.extra);
-    showToast('Loaded');
+  function loadItem(it: HistoryItem) {
+    setPreset(it.preset);
+    setNiche(it.niche);
+    setMain(it.main);
+    setExtra(it.extra);
+    setToast('Loaded');
   }
 
   function deleteHistory(id: string) {
     setHistory((prev) => prev.filter((x) => x.id !== id));
-    showToast('Deleted');
+    setToast('Deleted');
   }
 
-  const stylesRow: { key: StyleKey; pill: string }[] = [
-    { key: 'cinematic', pill: 'Cinematic' },
-    { key: 'horror', pill: 'Horror' },
-    { key: 'funny', pill: 'Lucu' },
-    { key: 'ugc', pill: 'UGC' },
-    { key: 'doc', pill: 'Doc' },
-    { key: 'broll', pill: 'B-roll (No Character)' },
-    { key: 'weird', pill: 'Weird / Random' },
-    { key: 'sweepy', pill: 'Sweepy 🧹' },
-    { key: 'hanz', pill: 'Hanz 👤' },
-  ];
+  function deleteSaved(id: string) {
+    setSaved((prev) => prev.filter((x) => x.id !== id));
+    setToast('Deleted');
+  }
 
-  const nichesRow: { key: NicheKey; pill: string }[] = [
-    { key: 'general', pill: 'General' },
-    { key: 'health', pill: 'Health' },
-    { key: 'fitness', pill: 'Fitness' },
-    { key: 'skincare', pill: 'Skincare' },
-    { key: 'food', pill: 'Food' },
-    { key: 'review', pill: 'Review' },
-  ];
+  function clearHistory() {
+    setHistory([]);
+    setToast('History cleared');
+  }
+
+  function clearSaved() {
+    setSaved([]);
+    setToast('Saved cleared');
+  }
+
+  // setiap kali user copy prompt/caption → simpan ke history otomatis (biar kerasa “kepake”)
+  function onCopyPrompt() {
+    if (!finalPrompt.trim()) return;
+    pushHistory();
+    copyText(finalPrompt, 'Prompt copied ✅');
+  }
+
+  function onCopyCaption() {
+    if (!captionWithHashtags.trim()) return;
+    pushHistory();
+    copyText(captionWithHashtags, 'Caption copied ✅');
+  }
 
   return (
-    <main className="min-h-screen bg-[#0b0f16] text-white">
-      {/* soft background */}
-      <div className="pointer-events-none fixed inset-0 opacity-80">
-        <div className="absolute -top-28 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-emerald-500/20 blur-3xl" />
-        <div className="absolute top-56 -left-20 h-72 w-72 rounded-full bg-sky-500/15 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-fuchsia-500/10 blur-3xl" />
-      </div>
+    <main className="page">
+      {/* glow bg */}
+      <div className="bgGlow" aria-hidden="true" />
 
-      <div className="relative mx-auto w-full max-w-[720px] px-4 pb-20 pt-8">
-        {/* Header */}
-        <header className="mb-5">
-          <h1 className="text-3xl font-extrabold tracking-tight">Sora Lite — Prompt Builder</h1>
-          <p className="mt-2 text-sm text-white/70">
-            Preset + Niche + Tag + Caption + 5 Hashtag + History (local).
-          </p>
+      <div className="container">
+        <header className="header">
+          <h1 className="title">Sora Lite — Prompt Builder</h1>
+          <p className="subtitle">Preset + Niche + Caption + 5 Hashtag + History + Save (local).</p>
         </header>
 
-        {/* Cards */}
-        <section className="space-y-4">
-          {/* Preset */}
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 shadow-[0_20px_80px_rgba(0,0,0,0.35)] backdrop-blur">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-bold">Preset Style</h2>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={autoGenerate}
-                  className="rounded-2xl bg-emerald-400/90 px-3 py-2 text-sm font-semibold text-black shadow hover:bg-emerald-300 active:scale-[0.99]"
-                >
-                  Auto Generate
-                </button>
-                <button
-                  onClick={clearAll}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white/90 hover:bg-white/10 active:scale-[0.99]"
-                >
-                  Clear
-                </button>
-              </div>
+        {/* PRESET (TOP) */}
+        <section className="card">
+          <div className="cardTop">
+            <div>
+              <div className="cardTitle">Preset Karakter</div>
+              <div className="cardHint">Pilih karakter di atas. Niche dipilih di bawah.</div>
             </div>
-
-            <p className="mt-2 text-sm text-white/70">
-              Pilih gaya visual. Kamu juga bisa pilih karakter (Sweepy / Hanz).{' '}
-              <span className="font-semibold text-emerald-300">Niche tetap bisa dipilih kapan pun.</span>
-            </p>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {stylesRow.map((s) => {
-                const active = style === s.key;
-                return (
-                  <button
-                    key={s.key}
-                    onClick={() => setStyle(s.key)}
-                    className={[
-                      'rounded-2xl px-4 py-2 text-sm font-semibold transition active:scale-[0.99]',
-                      active
-                        ? 'bg-emerald-400 text-black shadow'
-                        : 'border border-white/10 bg-white/5 text-white/90 hover:bg-white/10',
-                    ].join(' ')}
-                  >
-                    {s.pill}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3">
-              <div className="text-sm font-semibold text-white/80">Preset detail</div>
-              <div className="mt-2 text-sm text-white/70">{activeStyleDetail}</div>
-            </div>
+            <button className="btn ghost" onClick={clearAll} type="button">
+              Clear
+            </button>
           </div>
 
-          {/* Niche */}
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-            <h2 className="text-lg font-bold">Niche</h2>
-            <p className="mt-2 text-sm text-white/70">Pilih niche konten. Ini tidak akan terkunci walau pilih Sweepy/Hanz.</p>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {nichesRow.map((n) => {
-                const active = niche === n.key;
-                return (
-                  <button
-                    key={n.key}
-                    onClick={() => setNiche(n.key)}
-                    className={[
-                      'rounded-2xl px-4 py-2 text-sm font-semibold transition active:scale-[0.99]',
-                      active
-                        ? 'bg-sky-400 text-black shadow'
-                        : 'border border-white/10 bg-white/5 text-white/90 hover:bg-white/10',
-                    ].join(' ')}
-                  >
-                    {n.pill}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-3 text-xs text-white/60">
-              Hint: <span className="text-white/80">{NICHE_PRESETS[niche].hint}</span>
-            </div>
-          </div>
-
-          {/* Tag */}
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-            <h2 className="text-lg font-bold">Tag</h2>
-            <p className="mt-2 text-sm text-white/70">Klik untuk aktif/nonaktif. Default: daily</p>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {TAGS.map((t) => {
-                const active = tags.includes(t.key);
-                return (
-                  <button
-                    key={t.key}
-                    onClick={() => toggleTag(t.key)}
-                    className={[
-                      'rounded-2xl px-4 py-2 text-sm font-semibold transition active:scale-[0.99]',
-                      active
-                        ? 'bg-emerald-400 text-black shadow'
-                        : 'border border-white/10 bg-white/5 text-white/90 hover:bg-white/10',
-                    ].join(' ')}
-                  >
-                    {t.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Inputs */}
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-            <h2 className="text-lg font-bold">Prompt Utama</h2>
-            <p className="mt-2 text-sm text-white/70">Isi inti adegan / cerita.</p>
-
-            <textarea
-              value={main}
-              onChange={(e) => setMain(e.target.value)}
-              placeholder="Contoh: Karakter monyet hoodie lucu sedang membersihkan selokan penuh sampah plastik..."
-              className="mt-3 h-28 w-full resize-none rounded-2xl border border-white/10 bg-black/25 p-3 text-sm text-white outline-none placeholder:text-white/40 focus:border-emerald-400/60"
-            />
-
-            <h3 className="mt-4 text-lg font-bold">Extra (Opsional)</h3>
-            <p className="mt-2 text-sm text-white/70">Camera, lighting, mood, narasi (no text), dll.</p>
-
-            <textarea
-              value={extra}
-              onChange={(e) => setExtra(e.target.value)}
-              placeholder="Contoh: 10–15 detik, kamera dari belakang, slow push-in, NO watermark, NO text overlay..."
-              className="mt-3 h-24 w-full resize-none rounded-2xl border border-white/10 bg-black/25 p-3 text-sm text-white outline-none placeholder:text-white/40 focus:border-emerald-400/60"
-            />
-          </div>
-
-          {/* Output */}
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-bold">Output</h2>
+          <div className="chipRow">
+            {(['general', 'sweepy', 'hanz'] as PresetKey[]).map((k) => (
               <button
-                onClick={saveToHistory}
-                className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white/90 hover:bg-white/10 active:scale-[0.99]"
+                key={k}
+                className={`chip ${preset === k ? 'active' : ''}`}
+                onClick={() => setPreset(k)}
+                type="button"
               >
-                Save
+                {PRESET_LABEL[k]}
               </button>
-            </div>
-
-            <div className="mt-3 rounded-2xl border border-white/10 bg-black/25 p-3">
-              <div className="text-xs font-semibold text-white/60">Final Prompt</div>
-              <div className="mt-2 whitespace-pre-wrap text-sm text-white/85">{finalPrompt}</div>
-
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => copyText(finalPrompt)}
-                  className="flex-1 rounded-2xl bg-emerald-400/90 px-3 py-2 text-sm font-bold text-black hover:bg-emerald-300 active:scale-[0.99]"
-                >
-                  Copy Prompt
-                </button>
-                <button
-                  onClick={() => copyText(captionBlock)}
-                  className="flex-1 rounded-2xl bg-sky-400/90 px-3 py-2 text-sm font-bold text-black hover:bg-sky-300 active:scale-[0.99]"
-                >
-                  Copy Caption
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-2xl border border-white/10 bg-black/25 p-3">
-              <div className="text-xs font-semibold text-white/60">Caption + Hashtag</div>
-              <div className="mt-2 whitespace-pre-wrap text-sm text-white/85">{captionBlock}</div>
-            </div>
+            ))}
           </div>
 
-          {/* History */}
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold">History</h2>
-              <button
-                onClick={() => {
-                  setHistory([]);
-                  showToast('History cleared');
-                }}
-                className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white/90 hover:bg-white/10 active:scale-[0.99]"
-              >
-                Clear History
-              </button>
-            </div>
-
-            {history.length === 0 ? (
-              <p className="mt-3 text-sm text-white/60">Belum ada.</p>
-            ) : (
-              <div className="mt-3 space-y-2">
-                {history.slice(0, 10).map((h) => (
-                  <div key={h.id} className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-bold">
-                          {STYLE_PRESETS[h.style].label} • {NICHE_PRESETS[h.niche].label}
-                        </div>
-                        <div className="mt-1 text-xs text-white/60">
-                          {new Date(h.ts).toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => applyHistory(h)}
-                          className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15 active:scale-[0.99]"
-                        >
-                          Load
-                        </button>
-                        <button
-                          onClick={() => deleteHistory(h.id)}
-                          className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/15 active:scale-[0.99]"
-                        >
-                          Del
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-2 line-clamp-3 text-sm text-white/75">{h.finalPrompt}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="miniBox">
+            <div className="miniLabel">Preset detail</div>
+            <div className="miniText">{PRESET_TEXT[preset]}</div>
           </div>
         </section>
 
-        {/* Toast */}
-        {toast && (
-          <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl bg-black/80 px-4 py-2 text-sm text-white shadow backdrop-blur">
-            {toast}
+        {/* NICHE (UNDER PRESET) with Auto Generate on top-right */}
+        <section className="card">
+          <div className="cardTop">
+            <div>
+              <div className="cardTitle">Niche</div>
+              <div className="cardHint">Auto Generate akan mengikuti niche yang kamu pilih (tidak loncat).</div>
+            </div>
+
+            {/* Auto Generate: kanan atas BOX niche */}
+            <button className="btn" onClick={autoGenerate} type="button">
+              Auto Generate
+            </button>
           </div>
-        )}
+
+          <div className="chipRow">
+            {(['daily', 'lucu', 'kesehatan', 'ugc', 'horror'] as NicheKey[]).map((k) => (
+              <button
+                key={k}
+                className={`chip ${niche === k ? 'active' : ''}`}
+                onClick={() => setNiche(k)}
+                type="button"
+              >
+                {NICHE_LABEL[k]}
+              </button>
+            ))}
+          </div>
+
+          <div className="miniBox">
+            <div className="miniLabel">Niche hint</div>
+            <div className="miniText">{NICHE_GUIDE[niche]}</div>
+          </div>
+        </section>
+
+        {/* INPUTS */}
+        <section className="card">
+          <div className="cardTitle">Prompt Utama</div>
+          <div className="cardHint">Isi inti adegan/cerita. Ini yang paling penting.</div>
+          <textarea
+            className="textarea"
+            value={main}
+            onChange={(e) => setMain(e.target.value)}
+            placeholder="Contoh: Sweepy sedang membersihkan selokan penuh sampah plastik, lalu menemukan anak kucing dan menolongnya..."
+            rows={5}
+          />
+        </section>
+
+        <section className="card">
+          <div className="cardTitle">Extra (Opsional)</div>
+          <div className="cardHint">Camera, lighting, mood, lokasi, gerakan kamera, dll.</div>
+          <textarea
+            className="textarea"
+            value={extra}
+            onChange={(e) => setExtra(e.target.value)}
+            placeholder="Contoh: handheld phone camera, soft daylight, close-up reaction, quick cut transitions..."
+            rows={3}
+          />
+        </section>
+
+        {/* OUTPUT */}
+        <section className="card">
+          <div className="cardTop">
+            <div>
+              <div className="cardTitle">Final Prompt</div>
+              <div className="cardHint">Gabungan preset + niche + prompt utama + extra.</div>
+            </div>
+            <button className="btn ghost" onClick={saveCurrent} type="button">
+              Save Prompt
+            </button>
+          </div>
+
+          <div className="outputBox">{finalPrompt || 'Isi Prompt Utama dulu…'}</div>
+
+          <div className="btnRow">
+            <button className="btn wide" onClick={onCopyPrompt} type="button" disabled={!finalPrompt.trim()}>
+              Copy Prompt
+            </button>
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="cardTitle">Caption + Hashtags</div>
+          <div className="cardHint">Auto caption + 5 hashtag (copy sekali tap).</div>
+
+          <div className="outputBox">{captionWithHashtags || 'Isi Prompt Utama dulu…'}</div>
+
+          <div className="btnRow">
+            <button className="btn wide" onClick={onCopyCaption} type="button" disabled={!captionWithHashtags.trim()}>
+              Copy Caption
+            </button>
+          </div>
+        </section>
+
+        {/* SAVED */}
+        <section className="card">
+          <div className="cardTop">
+            <div>
+              <div className="cardTitle">Saved Prompts</div>
+              <div className="cardHint">Yang kamu simpan manual (local).</div>
+            </div>
+            <button className="btn ghost" onClick={clearSaved} type="button" disabled={!saved.length}>
+              Clear Saved
+            </button>
+          </div>
+
+          {saved.length === 0 ? (
+            <div className="empty">Belum ada saved. Tekan “Save Prompt” untuk menyimpan.</div>
+          ) : (
+            <div className="list">
+              {saved.map((s) => (
+                <div key={s.id} className="listItem">
+                  <div className="listLeft">
+                    <div className="listTitle">{s.name}</div>
+                    <div className="listMeta">
+                      {PRESET_LABEL[s.data.preset]} • {NICHE_LABEL[s.data.niche]}
+                    </div>
+                  </div>
+                  <div className="listActions">
+                    <button className="btn tiny" onClick={() => loadItem(s.data)} type="button">
+                      Load
+                    </button>
+                    <button className="btn tiny ghost" onClick={() => deleteSaved(s.id)} type="button">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* HISTORY */}
+        <section className="card">
+          <div className="cardTop">
+            <div>
+              <div className="cardTitle">History</div>
+              <div className="cardHint">Terisi otomatis saat kamu Copy Prompt/Caption. (Max 30)</div>
+            </div>
+            <button className="btn ghost" onClick={clearHistory} type="button" disabled={!history.length}>
+              Clear History
+            </button>
+          </div>
+
+          {history.length === 0 ? (
+            <div className="empty">Belum ada history. Coba Copy Prompt atau Copy Caption.</div>
+          ) : (
+            <div className="list">
+              {history.map((h) => (
+                <div key={h.id} className="listItem">
+                  <div className="listLeft">
+                    <div className="listTitle">{h.main.length > 60 ? h.main.slice(0, 60) + '…' : h.main}</div>
+                    <div className="listMeta">
+                      {PRESET_LABEL[h.preset]} • {NICHE_LABEL[h.niche]}
+                    </div>
+                  </div>
+                  <div className="listActions">
+                    <button className="btn tiny" onClick={() => loadItem(h)} type="button">
+                      Load
+                    </button>
+                    <button className="btn tiny ghost" onClick={() => deleteHistory(h.id)} type="button">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <footer className="footer">
+          <div className="footerNote">Tips: pilih Preset → pilih Niche → isi Prompt Utama → Copy.</div>
+        </footer>
       </div>
+
+      {toast ? <div className="toast">{toast}</div> : null}
     </main>
   );
 }
