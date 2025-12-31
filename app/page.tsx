@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
+/* =====================
+   TYPES
+===================== */
 type StyleKey =
   | "cinematic"
   | "horror"
@@ -15,19 +18,31 @@ type StyleKey =
 
 type TagKey = "horror" | "daily" | "review" | "lucu";
 
-const STYLE_ORDER: StyleKey[] = [
-  "cinematic",
-  "horror",
-  "lucu",
-  "ugc",
-  "doc",
-  "broll",
-  "weird",
-  "sweepy",
-  "hanz",
-];
+/* =====================
+   PRESETS
+===================== */
+const STYLE_PRESETS: Record<StyleKey, string> = {
+  cinematic:
+    "cinematic film look, high contrast, soft film grain, shallow depth of field, smooth dolly movement, dramatic lighting, professional color grading",
+  horror:
+    "cinematic horror mood, low-key lighting, eerie shadow, slow camera push, suspenseful pacing, creepy but not extreme",
+  lucu:
+    "funny light-hearted tone, expressive motion, playful timing, bright lighting, comedic framing",
+  ugc:
+    "UGC creator style, handheld camera, natural lighting, authentic daily vibe, relatable tone",
+  doc:
+    "short documentary style, informative tone, clean framing, calm camera movement, natural ambience",
+  broll:
+    "b-roll only, no character, clean composition, smooth motion, cinematic detail shots",
+  weird:
+    "absurd weird concept, unexpected combination, surreal humor, experimental camera",
+  sweepy:
+    "cute quirky mascot character named Sweepy, playful cleanup hero vibe, expressive motion, fun camera angles, short viral pacing",
+  hanz:
+    "realistic Indonesian male character named Hanz, confident and expressive, UGC creator style, natural lighting, cinematic but relatable",
+};
 
-const STYLE_LABEL: Record<StyleKey, string> = {
+const LABELS: Record<StyleKey, string> = {
   cinematic: "Cinematic",
   horror: "Horror",
   lucu: "Lucu",
@@ -46,358 +61,186 @@ const TAGS: { key: TagKey; label: string }[] = [
   { key: "lucu", label: "lucu" },
 ];
 
-const STYLE_PRESETS: Record<StyleKey, string> = {
-  cinematic:
-    "cinematic film look, high contrast, soft film grain, shallow depth of field, smooth dolly moves, dramatic lighting, professional color grading",
-  horror:
-    "cinematic horror, low-key lighting, eerie shadows, suspenseful pacing, cold color temperature, creepy ambience (NO extreme gore), subtle camera shake",
-  lucu:
-    "light comedy vibe, playful timing, expressive reactions, warm lighting, fun camera moves, short-form viral energy, wholesome humor",
-  ugc:
-    "UGC style, handheld phone camera, natural lighting, casual authentic vibe, real-life setting, quick cuts, captions-friendly framing",
-  doc:
-    "documentary style, natural soundscape, steady camera, honest framing, informative tone, realistic details, clean composition",
-  broll:
-    "high-quality B-roll, product/scene focused, no main character, clean composition, macro details, smooth slow motion, cinematic lighting",
-  weird:
-    "absurd weird internet vibe, unexpected twist, surreal but grounded visuals, comedic contrast, quick reveal, visually memorable",
-  sweepy:
-    "cute quirky mascot character named Sweepy, expressive motion, playful cleanup hero vibe, fun camera angles, short viral pacing, realistic lighting",
-  hanz:
-    "realistic Indonesian male creator named Hanz, confident and expressive, natural UGC delivery, relatable daily setting, handheld feel, modern cinematic grade",
+/* =====================
+   IDEA BANK
+===================== */
+const IDEA_BANK: Record<StyleKey, string[]> = {
+  cinematic: [
+    "Seorang kreator membuka pintu ruangan gelap, cahaya sinematik menyembur dari dalam, kamera slow push-in.",
+    "Close-up tangan menaruh produk, cut ke detail tekstur, reveal hasil akhir.",
+  ],
+  horror: [
+    "Sweepy menonton TV horor, sosok di layar mendekat, Sweepy ketok kepala pakai remote.",
+    "Lorong gelap, suara langkah, ternyata cuma kucing lewat — jumpscare lucu.",
+  ],
+  lucu: [
+    "Karakter panik cari remote, ternyata dari tadi ada di tangan sendiri.",
+    "Hanz serius bicara, tapi teks overlay-nya makin absurd.",
+  ],
+  ugc: [
+    "Hanz: 'Gue kasih satu trik biar prompt lo hidup…' lalu contoh singkat.",
+    "Masalah → solusi → hasil, gaya santai dan jujur.",
+  ],
+  doc: [
+    "Mini dokumenter 15 detik: suasana, detail, narasi singkat.",
+    "B-roll + fakta cepat, tone informatif.",
+  ],
+  broll: [
+    "B-roll produk: macro detail, slow motion, soft light.",
+    "B-roll suasana: panning pelan, ambience alami.",
+  ],
+  weird: [
+    "Monyet pakai jas hujan mini jadi petugas kebersihan profesional.",
+    "Rapat serius manusia dan monyet bahas pisang vs kopi.",
+  ],
+  sweepy: [
+    "Sweepy membersihkan lingkungan, menemukan portal dari tumpukan kardus.",
+    "Sweepy menegur sampah plastik seolah orang.",
+  ],
+  hanz: [
+    "Hanz bikin intro UGC lalu reveal hasil prompt cinematic.",
+    "Rutinitas pagi Hanz, 3 cut cepat, caption rapi.",
+  ],
 };
 
-type HistoryItem = {
-  id: string;
-  ts: number;
-  preset: StyleKey;
-  tags: TagKey[];
-  prompt: string;
-  extra: string;
-  finalPrompt: string;
-};
-
-function buildHashtags(preset: StyleKey, tags: TagKey[]) {
-  const base = ["#sora", "#soraai", "#aivideo", "#prompt", "#contentcreator"];
-
-  const tagMap: Record<TagKey, string> = {
-    horror: "#horor",
-    daily: "#dailycontent",
-    review: "#reviewproduk",
-    lucu: "#lucu",
-  };
-
-  const presetMap: Record<StyleKey, string> = {
-    cinematic: "#cinematic",
-    horror: "#horror",
-    lucu: "#comedy",
-    ugc: "#ugc",
-    doc: "#documentary",
-    broll: "#broll",
-    weird: "#weird",
-    sweepy: "#sweepy",
-    hanz: "#hanz",
-  };
-
-  const picked = [
-    presetMap[preset],
-    ...tags.map((t) => tagMap[t]),
-    ...base,
-  ];
-
-  // unik + ambil 5
-  return Array.from(new Set(picked)).slice(0, 5);
+function pickRandom<T>(arr: T[]) {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
+/* =====================
+   COMPONENT
+===================== */
 export default function Page() {
   const [preset, setPreset] = useState<StyleKey>("cinematic");
-  const [activeTags, setActiveTags] = useState<TagKey[]>(["daily"]);
   const [prompt, setPrompt] = useState("");
   const [extra, setExtra] = useState("");
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [tag, setTag] = useState<TagKey>("daily");
   const [toast, setToast] = useState("");
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("sora_lite_history_v2");
-      if (raw) setHistory(JSON.parse(raw));
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("sora_lite_history_v2", JSON.stringify(history));
-    } catch {}
-  }, [history]);
-
-  const finalPrompt = useMemo(() => {
-    const base = STYLE_PRESETS[preset];
-    const main = prompt.trim();
-    const ex = extra.trim();
-    if (!main && !ex) return "";
-
-    return [
-      `STYLE: ${base}`,
-      main ? `SCENE: ${main}` : "",
-      ex ? `DETAILS: ${ex}` : "",
-      "OUTPUT: 10–15 seconds, vertical 9:16, high quality, clean motion",
-    ]
-      .filter(Boolean)
-      .join("\n");
-  }, [preset, prompt, extra]);
-
-  const captionBlock = useMemo(() => {
-    if (!finalPrompt) return "";
-    const tags: TagKey[] = activeTags.length ? activeTags : ["daily"];
-    const hashtags = buildHashtags(preset, tags).join(" ");
-    return `Caption:\n${prompt.trim() || "(isi adegan kamu)"}\n\n${hashtags}`;
-  }, [finalPrompt, preset, activeTags, prompt]);
-
-  function toggleTag(tag: TagKey) {
-    setActiveTags((prev) => {
-      const has = prev.includes(tag);
-      const next = has ? prev.filter((t) => t !== tag) : [...prev, tag];
-      return next.length ? next : ["daily"];
-    });
-  }
-
-  async function copyText(text: string) {
-    if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
-      setToast("✅ Disalin");
-      setTimeout(() => setToast(""), 1200);
-    } catch {
-      setToast("⚠️ Gagal copy");
-      setTimeout(() => setToast(""), 1200);
+  function autoGenerate() {
+    setPrompt(pickRandom(IDEA_BANK[preset]));
+    if (!extra) {
+      setExtra("camera natural, lighting soft, no watermark, clean motion");
     }
-  }
-
-  function saveHistory() {
-    if (!finalPrompt) return;
-    const item: HistoryItem = {
-      id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
-      ts: Date.now(),
-      preset,
-      tags: activeTags.length ? activeTags : ["daily"],
-      prompt: prompt.trim(),
-      extra: extra.trim(),
-      finalPrompt,
-    };
-    setHistory((prev) => [item, ...prev].slice(0, 30));
-    setToast("✅ Tersimpan");
+    setToast("✨ Auto idea dibuat");
     setTimeout(() => setToast(""), 1200);
-  }
-
-  function loadHistory(item: HistoryItem) {
-    setPreset(item.preset);
-    setActiveTags(item.tags?.length ? item.tags : ["daily"]);
-    setPrompt(item.prompt || "");
-    setExtra(item.extra || "");
-    setToast("↩️ Loaded");
-    setTimeout(() => setToast(""), 1200);
-    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   return (
-    <main className="min-h-screen bg-[#0b0f16] text-white">
-      {/* soft glow */}
-      <div className="pointer-events-none fixed inset-0 opacity-70">
-        <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-emerald-500/20 blur-3xl" />
-        <div className="absolute top-40 -left-24 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-pink-500/10 blur-3xl" />
-      </div>
-
-      <div className="relative mx-auto w-full max-w-md px-4 pb-28 pt-6">
-        <header className="mb-4">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Sora Lite — Prompt Builder
-          </h1>
-          <p className="mt-1 text-sm text-white/70">
-            Preset + Tag + Caption + 5 Hashtag + History (local).
+    <main className="min-h-screen bg-gradient-to-b from-[#0b0f16] to-[#06080d] text-white">
+      <div className="mx-auto max-w-md px-4 py-6 space-y-6">
+        {/* HEADER */}
+        <header>
+          <h1 className="text-2xl font-bold">Sora Lite — Prompt Builder</h1>
+          <p className="text-sm opacity-70">
+            Preset + Tag + Caption + 5 Hashtag
           </p>
         </header>
 
-        {/* preset */}
-        <section className="rounded-3xl bg-white/5 p-4 shadow-lg ring-1 ring-white/10 backdrop-blur">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Preset Style</h2>
-            <button
-              onClick={() => setPrompt("")}
-              className="rounded-full bg-white/10 px-3 py-2 text-xs font-semibold ring-1 ring-white/10"
-            >
-              Clear
-            </button>
+        {/* PRESET */}
+        <section className="rounded-2xl bg-white/5 p-4 space-y-3">
+          <div className="flex justify-between items-center">
+            <h2 className="font-semibold">Preset Style</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={autoGenerate}
+                className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-semibold text-black"
+              >
+                Auto Generate
+              </button>
+              <button
+                onClick={() => {
+                  setPrompt("");
+                  setExtra("");
+                }}
+                className="rounded-full bg-white/10 px-3 py-1 text-xs"
+              >
+                Clear
+              </button>
+            </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            {STYLE_ORDER.map((key) => {
-              const active = preset === key;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setPreset(key)}
-                  className={[
-                    "rounded-full px-4 py-2 text-sm font-medium transition ring-1 ring-white/10",
-                    active
-                      ? "bg-emerald-400/90 text-black"
-                      : "bg-white/10 text-white hover:bg-white/15",
-                  ].join(" ")}
-                >
-                  {STYLE_LABEL[key]}
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(STYLE_PRESETS) as StyleKey[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => setPreset(key)}
+                className={`rounded-full px-3 py-2 text-xs ${
+                  preset === key
+                    ? "bg-emerald-500 text-black"
+                    : "bg-white/10"
+                }`}
+              >
+                {LABELS[key]}
+              </button>
+            ))}
           </div>
 
-          <div className="mt-4 rounded-2xl bg-black/30 p-3 ring-1 ring-white/10">
-            <div className="text-xs font-semibold text-white/70">
-              Preset detail
-            </div>
-            <div className="mt-2 whitespace-pre-wrap text-sm text-white/90">
-              {STYLE_PRESETS[preset]}
-            </div>
+          <div className="text-xs opacity-80">
+            {STYLE_PRESETS[preset]}
           </div>
         </section>
 
-        {/* tags */}
-        <section className="mt-4 rounded-3xl bg-white/5 p-4 shadow-lg ring-1 ring-white/10 backdrop-blur">
-          <h2 className="text-base font-semibold">Tag</h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {TAGS.map((t) => {
-              const active = activeTags.includes(t.key);
-              return (
-                <button
-                  key={t.key}
-                  onClick={() => toggleTag(t.key)}
-                  className={[
-                    "rounded-full px-4 py-2 text-sm font-medium transition ring-1 ring-white/10",
-                    active
-                      ? "bg-emerald-400/90 text-black"
-                      : "bg-white/10 text-white hover:bg-white/15",
-                  ].join(" ")}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
+        {/* TAG */}
+        <section className="rounded-2xl bg-white/5 p-4 space-y-2">
+          <h2 className="font-semibold">Tag</h2>
+          <div className="flex gap-2">
+            {TAGS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTag(t.key)}
+                className={`rounded-full px-3 py-1 text-xs ${
+                  tag === t.key
+                    ? "bg-emerald-500 text-black"
+                    : "bg-white/10"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-          <p className="mt-2 text-xs text-white/60">
-            * Kalau tidak pilih apa-apa, default: <b>daily</b>
-          </p>
         </section>
 
-        {/* input */}
-        <section className="mt-4 rounded-3xl bg-white/5 p-4 shadow-lg ring-1 ring-white/10 backdrop-blur">
-          <h2 className="text-base font-semibold">Prompt Utama</h2>
+        {/* PROMPT */}
+        <section className="rounded-2xl bg-white/5 p-4 space-y-2">
+          <h2 className="font-semibold">Prompt Utama</h2>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            rows={5}
-            placeholder="Contoh: Sweepy menonton film horor, sosok di TV mau keluar, Sweepy mengetuk kepala dengan remote..."
-            className="mt-3 w-full rounded-2xl bg-black/30 p-3 text-sm text-white placeholder:text-white/40 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
+            rows={4}
+            className="w-full rounded-xl bg-black/40 p-3 text-sm outline-none"
+            placeholder="Isi inti adegan / cerita..."
           />
+        </section>
 
-          <h3 className="mt-4 text-sm font-semibold">Extra (Opsional)</h3>
+        {/* EXTRA */}
+        <section className="rounded-2xl bg-white/5 p-4 space-y-2">
+          <h2 className="font-semibold">Extra (Opsional)</h2>
           <textarea
             value={extra}
             onChange={(e) => setExtra(e.target.value)}
             rows={3}
-            placeholder="Contoh: kamera dari belakang, slow push-in, teks overlay, NO watermark..."
-            className="mt-3 w-full rounded-2xl bg-black/30 p-3 text-sm text-white placeholder:text-white/40 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
+            className="w-full rounded-xl bg-black/40 p-3 text-sm outline-none"
+            placeholder="Camera, lighting, mood..."
           />
         </section>
 
-        {/* output */}
-        <section className="mt-4 rounded-3xl bg-white/5 p-4 shadow-lg ring-1 ring-white/10 backdrop-blur">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-base font-semibold">Output</h2>
-            <button
-              onClick={saveHistory}
-              disabled={!finalPrompt}
-              className="rounded-full bg-emerald-400/90 px-3 py-2 text-xs font-semibold text-black disabled:opacity-40"
-            >
-              Save
-            </button>
-          </div>
-
-          <div className="mt-3 rounded-2xl bg-black/30 p-3 ring-1 ring-white/10">
-            <div className="text-xs font-semibold text-white/70">Final Prompt</div>
-            <pre className="mt-2 whitespace-pre-wrap break-words text-sm text-white/90">
-              {finalPrompt || "— isi prompt untuk melihat hasil —"}
-            </pre>
-          </div>
-
-          <div className="mt-3 rounded-2xl bg-black/30 p-3 ring-1 ring-white/10">
-            <div className="text-xs font-semibold text-white/70">
-              Caption + 5 Hashtag
-            </div>
-            <pre className="mt-2 whitespace-pre-wrap break-words text-sm text-white/90">
-              {captionBlock || "— isi prompt untuk melihat caption —"}
-            </pre>
-          </div>
-        </section>
-
-        {/* history */}
-        <section className="mt-4 rounded-3xl bg-white/5 p-4 shadow-lg ring-1 ring-white/10 backdrop-blur">
-          <h2 className="text-base font-semibold">History</h2>
-          <div className="mt-3 space-y-2">
-            {history.length === 0 ? (
-              <div className="rounded-2xl bg-black/30 p-3 text-sm text-white/70 ring-1 ring-white/10">
-                Belum ada history. Klik <b>Save</b> setelah prompt jadi.
-              </div>
-            ) : (
-              history.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => loadHistory(item)}
-                  className="w-full rounded-2xl bg-black/30 p-3 text-left ring-1 ring-white/10 hover:bg-black/40"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold">
-                      {STYLE_LABEL[item.preset]}
-                    </div>
-                    <div className="text-xs text-white/60">
-                      {new Date(item.ts).toLocaleString("id-ID")}
-                    </div>
-                  </div>
-                  <div className="mt-1 text-sm text-white/80">
-                    {(item.prompt || item.extra || "(tanpa isi)").slice(0, 120)}
-                    {(item.prompt || item.extra || "").length > 120 ? "…" : ""}
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        </section>
-
-        {/* toast */}
-        {toast ? (
-          <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-black/70 px-4 py-2 text-sm text-white ring-1 ring-white/10 backdrop-blur">
-            {toast}
-          </div>
-        ) : null}
-
-        {/* bottom bar */}
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#0b0f16]/80 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-md items-center gap-2 px-4 py-3">
-            <button
-              onClick={() => copyText(finalPrompt)}
-              disabled={!finalPrompt}
-              className="flex-1 rounded-2xl bg-white/10 px-4 py-3 text-sm font-semibold ring-1 ring-white/10 disabled:opacity-40"
-            >
-              Copy Prompt
-            </button>
-            <button
-              onClick={() => copyText(captionBlock)}
-              disabled={!captionBlock}
-              className="flex-1 rounded-2xl bg-emerald-400/90 px-4 py-3 text-sm font-semibold text-black disabled:opacity-40"
-            >
-              Copy Caption
-            </button>
-          </div>
-        </div>
+        {/* ACTION */}
+        <footer className="grid grid-cols-2 gap-3">
+          <button className="rounded-xl bg-white/10 py-3 text-sm">
+            Copy Prompt
+          </button>
+          <button className="rounded-xl bg-emerald-500 py-3 text-sm text-black font-semibold">
+            Copy Caption
+          </button>
+        </footer>
       </div>
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-black/80 px-4 py-2 text-xs">
+          {toast}
+        </div>
+      )}
     </main>
   );
 }
