@@ -24,8 +24,8 @@ type SavedItem = {
   data: HistoryItem;
 };
 
-const LS_HISTORY = 'sora_lite_history_v5';
-const LS_SAVED = 'sora_lite_saved_v5';
+const LS_HISTORY = 'sora_lite_history_v6';
+const LS_SAVED = 'sora_lite_saved_v6';
 
 const PRESET_LABEL: Record<PresetKey, string> = {
   general: 'General',
@@ -42,7 +42,7 @@ const NICHE_LABEL: Record<NicheKey, string> = {
   horror: 'Horror',
 };
 
-// ====== Character / Preset definitions (sesuai request kamu) ======
+// ====== Character / Preset definitions ======
 const PRESET_TEXT: Record<PresetKey, string> = {
   general:
     'No specific character. Natural everyday scene, realistic details, clean composition, mobile-friendly framing.',
@@ -54,7 +54,7 @@ const PRESET_TEXT: Record<PresetKey, string> = {
     'Sweepy is a LITTLE MONKEY (real monkey anatomy, animal-like behavior). Smart and curious, expressive but NON-human gestures. Moves like a monkey, NOT a human in costume. NO human hands, NO human face, no standing/walking like a person. Believable animal actions only.',
 
   collab:
-    'Collaboration: @hanz26 (calm, stylish, neat) + Sweepy (little monkey, animal-only). Two characters appear together. Interaction is natural and safe: Hanz reacts/communicates calmly; Sweepy behaves like a monkey (curious, playful, clever). NO anthropomorphic monkey, NO human-like hands/face.',
+    'Collaboration: @hanz26 (calm, stylish, neat) + Sweepy (little monkey, animal-only). Two characters appear together. Interaction is natural and safe: Hanz reacts calmly; Sweepy behaves like a monkey (curious, playful, clever). NO anthropomorphic monkey, NO human-like hands/face.',
 };
 
 // ====== Niche guide ======
@@ -71,91 +71,153 @@ const NICHE_TEXT: Record<NicheKey, string> = {
     'Safe horror tone: suspense, eerie ambience, low-key lighting. NO extreme gore, non-graphic, safe twist ending.',
 };
 
-// ====== Auto ideas (neutral: tidak menyebut nama karakter, biar preset yang menentukan) ======
-const IDEAS: Record<NicheKey, Array<{ main: string; extra: string }>> = {
+// ====== Auto ideas: now slightly tailored per preset ======
+type Idea = { main: string; extra: string; presets?: PresetKey[] };
+
+const IDEAS: Record<NicheKey, Idea[]> = {
   daily: [
+    // Neutral
     {
-      main: 'Karakter menjalani rutinitas pagi yang rapi: rapihin outfit, cek barang bawaan, bikin kopi/teh, lalu siap berangkat. Fokus momen kecil yang estetik.',
+      main: 'Rutinitas pagi yang rapi: rapihin outfit, cek barang bawaan, bikin kopi/teh, lalu siap berangkat. Fokus momen kecil yang estetik.',
       extra:
         'soft morning light, slow pans, clean background, subtle b-roll details, 10–15s, 9:16',
     },
+    // Hanz
     {
-      main: 'Karakter beresin meja kerja sebentar (satisfying), lalu duduk santai sambil melihat suasana luar. Vibe tenang dan relatable.',
+      presets: ['hanz'],
+      main: 'Outfit check: karakter tampil santai tapi modis, merapikan kerah/jaket, lalu jalan keluar rumah dengan vibe tenang dan rapi.',
       extra:
-        'calm pacing, ambient sound vibe, close-up hands, smooth transitions, minimal text overlay',
+        'phone-friendly fashion b-roll, close-up fabric details, calm pacing, natural daylight, clean background',
     },
+    // Sweepy
     {
-      main: 'Karakter jalan santai sore hari, berhenti sebentar di tempat favorit (minimarket/cafe), lalu lanjut pulang. Natural daily life.',
+      presets: ['sweepy'],
+      main: 'Monyet kecil penasaran: Sweepy memeriksa sekitar rumah/halaman, mengendus benda kecil, lalu “menyusun” benda dengan cara monyet (animal-like).',
       extra:
-        'golden hour, gentle handheld, clean composition, realistic crowd blur, lifestyle vibe',
+        'real monkey movement, playful curiosity, close-up paws, natural outdoor light, no human gestures',
+    },
+    // Collab
+    {
+      presets: ['collab'],
+      main: 'Kolab santai: @hanz26 duduk rapi minum kopi, Sweepy datang penasaran, mengambil benda kecil, @hanz26 menatap tenang lalu tersenyum.',
+      extra:
+        'calm lifestyle vibe, soft daylight, reaction shots, safe interaction, monkey stays animal-like',
     },
   ],
   lucu: [
+    // Neutral
     {
-      main: 'Karakter mencoba bikin konten serius, tapi selalu ada gangguan kecil yang absurd (benda jatuh, suara random, kipas angin). Ending: ketawa dan lanjut take ulang.',
+      main: 'Karakter mencoba bikin konten serius, tapi selalu ada gangguan kecil yang absurd (benda jatuh, suara random, kipas angin). Ending: ketawa dan ulang take.',
       extra:
         'quick reaction cuts, comedic timing, punchline ending, wholesome, safe',
     },
+    // Hanz
     {
-      main: 'Karakter pengen tampil rapi, tapi setiap kali sudah “perfect”, ada detail kecil yang mengacaukan lucu (kerah, rambut, barang nyangkut).',
+      presets: ['hanz'],
+      main: '@hanz26 mau tampil rapi, tapi detail kecil selalu bikin lucu (kerah balik, rambut tertiup, barang nyangkut). Reaksi tetap tenang tapi akhirnya ketawa.',
       extra:
-        'short viral pacing, funny cutaways, quick zooms, friendly humor',
+        'subtle comedy, calm reactions, quick cutaways, phone camera vibe, safe humor',
     },
+    // Sweepy
     {
-      main: 'Karakter salah paham instruksi sederhana dan hasilnya kocak tapi aman. Ending: “oke, ulang lagi ya”.',
+      presets: ['sweepy'],
+      main: 'Sweepy (monyet kecil) mencoba meniru rutinitas manusia dengan cara monyet: ambil sisir, lalu malah menyisir benda lain. Lucu tapi tetap animal-like.',
       extra:
-        'playful tone, quick beats, safe and non-violent, minimal text overlay',
+        'real monkey behavior, playful confusion, comedic beats, no human hands/face, safe',
+    },
+    // Collab
+    {
+      presets: ['collab'],
+      main: '@hanz26 lagi rekam konten tenang, Sweepy tiba-tiba muncul “nyolong” properti kecil. @hanz26 menahan ketawa, lalu memberi isyarat pelan—Sweepy kabur.',
+      extra:
+        'comedic timing, reaction shots, safe playful chase, monkey stays animal-like',
     },
   ],
   kesehatan: [
+    // Neutral
     {
-      main: 'Tips 3 kebiasaan sehat yang gampang dilakukan setiap hari: minum air, jalan 5–10 menit, tidur lebih cepat. Singkat, jelas, tanpa klaim berlebihan.',
+      main: 'Tips 3 kebiasaan sehat yang gampang: minum air, jalan 5–10 menit, tidur lebih cepat. Singkat, jelas, tanpa klaim berlebihan.',
       extra:
-        'friendly educator vibe, clean overlays, calm pacing, safe disclaimers (no medical claims)',
+        'friendly tone, clean overlays, calm pacing, no medical claims, 10–15s',
     },
+    // Hanz
     {
-      main: 'Stretching singkat sebelum aktivitas: 3 gerakan mudah dan aman. Fokus pada sudut kamera yang jelas.',
+      presets: ['hanz'],
+      main: '@hanz26 memberi reminder sehat versi santai: minum air + jalan sebentar setelah duduk lama. Bahasa ringan, vibe tenang.',
       extra:
-        'clear angle, simple background, slow and safe, stop if pain disclaimer',
+        'talk-to-camera calm, minimal gestures, clean background, simple overlay text',
     },
+    // Sweepy (still animal-like; health content as “habit reminder” with playful monkey actions)
     {
-      main: 'Snack sehat sederhana (buah/yogurt) dengan visual estetik. Fokus tekstur dan plating simpel.',
+      presets: ['sweepy'],
+      main: 'Sweepy membawa botol air kecil (prop) dan duduk sejenak “istirahat”, lalu bergerak aktif sebentar. Pesan: minum & gerak ringan.',
       extra:
-        'soft kitchen light, close-up details, gentle b-roll, calm and clean',
+        'animal-like movement, cute but realistic, simple overlays, safe, no medical claims',
+    },
+    // Collab
+    {
+      presets: ['collab'],
+      main: '@hanz26 mengajak kebiasaan sehat ringan (minum air + jalan 5 menit). Sweepy muncul dan ikut bergerak kecil (tetap monyet).',
+      extra:
+        'friendly and calm, short b-roll, safe interaction, no medical claims',
     },
   ],
   ugc: [
+    // Neutral
     {
       main: 'UGC review singkat: hook 2 detik, masalahnya apa, solusi singkat, 2 manfaat, CTA halus. Natural dan jujur.',
       extra:
         'handheld phone, talk-to-camera, quick b-roll inserts, authentic tone, 10–15s',
     },
+    // Hanz (UGC style but calm & neat)
     {
-      main: '“Daily recommendation”: 1 hal kecil yang bikin hidup lebih gampang hari ini. Dibawakan santai dan relatable.',
+      presets: ['hanz'],
+      main: '@hanz26 UGC santai: “Ini yang aku suka / yang perlu kamu tahu” dalam 3 poin cepat. Tampil rapi, nada tenang.',
       extra:
-        'casual framing, natural light, simple subtitle style, friendly CTA',
+        'phone camera, calm voice vibe, clean b-roll, close-up details, minimal hype',
     },
+    // Sweepy (UGC without human talk; more “visual demo”)
     {
-      main: 'Perbandingan “sebelum vs sesudah” secara singkat, tetap realistis dan tidak klaim berlebihan.',
+      presets: ['sweepy'],
+      main: 'Sweepy mendemokan benda sederhana dengan cara monyet (misal membuka, mengetuk, menyusun). Fokus visual yang jelas, tanpa dialog manusia.',
       extra:
-        'fast cuts, honest vibe, avoid exaggerated promises, clear framing',
+        'clear close-ups, animal-like actions, simple overlays, safe, no human-like gestures',
+    },
+    // Collab
+    {
+      presets: ['collab'],
+      main: '@hanz26 menjelaskan 2 poin singkat, lalu Sweepy menunjukkan demo visual (tetap monyet). Ending: @hanz26 senyum dan CTA halus.',
+      extra:
+        'talk-to-camera + b-roll demo, safe interaction, clean framing, 9:16',
     },
   ],
   horror: [
+    // Neutral
     {
-      main: 'Ruangan sunyi, terdengar suara pelan dari arah pintu. Kamera pelan mendekat… twist ending: cuma barang jatuh/angin.',
+      main: 'Ruangan sunyi, terdengar suara pelan dari arah pintu. Kamera pelan mendekat… twist ending: cuma angin/barang jatuh.',
       extra:
         'low-key lighting, eerie ambience, slow push-in, safe non-graphic reveal',
     },
+    // Hanz (safe horror + calm reaction)
     {
-      main: 'Bayangan bergerak di dinding. Suspense naik… ternyata hanya pantulan lampu/kipas.',
+      presets: ['hanz'],
+      main: '@hanz26 di ruangan redup, mendengar suara kecil. Dia menoleh pelan, suspense naik… twist: cuma benda tergeser. Reaksi: tenang + lega.',
       extra:
-        'cinematic suspense, subtle camera shake, safe twist, no gore',
+        'cinematic suspense, soft grain, controlled camera shake, no gore, safe',
     },
+    // Sweepy (safe horror with monkey curiosity)
     {
-      main: 'Karakter menatap layar TV gelap, silhouette seolah mendekat… ternyata orang lewat di luar jendela.',
+      presets: ['sweepy'],
+      main: 'Sweepy melihat bayangan bergerak di dinding, mendekat dengan rasa penasaran (monyet). Twist: pantulan kipas/lampu. Sweepy kabur lucu.',
       extra:
-        'moody lighting, creepy ambience, safe and non-graphic, relief ending',
+        'eerie ambience but playful, safe twist, animal-like movement, no gore',
+    },
+    // Collab
+    {
+      presets: ['collab'],
+      main: '@hanz26 menyalakan lampu kecil, Sweepy mendengar suara dan ikut mendekat (tetap monyet). Twist: hanya tirai tertiup angin. Ending: mereka lega.',
+      extra:
+        'safe suspense, low-key lighting, reaction shots, non-graphic, 10–15s',
     },
   ],
 };
@@ -174,18 +236,22 @@ function safeParse<T>(raw: string | null, fallback: T): T {
   }
 }
 
+function pickFromPool(arr: Idea[]) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 function uniqueTop5(arr: string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const x of arr) {
-    const key = x.toLowerCase();
+    const tag = x.startsWith('#') ? x : `#${x}`;
+    const key = tag.toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
-      out.push(x.startsWith('#') ? x : `#${x}`);
+      out.push(tag);
     }
     if (out.length >= 5) break;
   }
-  while (out.length < 5) out.push('#sora');
   return out.slice(0, 5);
 }
 
@@ -198,17 +264,16 @@ function buildHashtags(preset: PresetKey, niche: NicheKey): string[] {
     horror: ['#horror', '#misteri', '#seram', '#cinematic', '#thriller'],
   };
 
-  const presetTag =
-    preset === 'hanz'
-      ? ['#hanz26', '#style']
-      : preset === 'sweepy'
-        ? ['#sweepy', '#monyet']
-        : preset === 'collab'
-          ? ['#hanz26', '#sweepy']
-          : ['#general'];
+  const presetTags: Record<PresetKey, string[]> = {
+    general: ['#soralite'],
+    hanz: ['#hanz26', '#style'],
+    sweepy: ['#sweepy', '#monyet'],
+    collab: ['#hanz26', '#sweepy'],
+  };
 
-  // 5 hashtag final
-  return uniqueTop5(['#sora', '#aivideo', ...baseByNiche[niche], ...presetTag]);
+  // Force base tags to be present
+  const merged = ['#sora', '#aivideo', ...baseByNiche[niche], ...presetTags[preset]];
+  return uniqueTop5(merged);
 }
 
 function buildCaption(preset: PresetKey, niche: NicheKey, main: string): string {
@@ -229,23 +294,42 @@ function buildCaption(preset: PresetKey, niche: NicheKey, main: string): string 
     horror: 'Berani nonton sampai habis? 👀',
   };
 
+  const styleByPreset: Record<PresetKey, string> = {
+    general: 'Vibe natural dan simple.',
+    hanz: 'Tenang, rapi, tetap modis.',
+    sweepy: 'Monyet kecil yang pintar (animal-only).',
+    collab: 'Kolab santai: manusia + monyet (aman & natural).',
+  };
+
   const teaser = main.trim()
     ? main.trim().slice(0, 110) + (main.trim().length > 110 ? '…' : '')
-    : 'Ide konten singkat yang gampang ditonton.';
+    : 'Isi prompt utama dulu untuk hasil terbaik.';
 
-  return `${vibeByNiche[niche]} (${who})\n${teaser}`;
+  return `${vibeByNiche[niche]} (${who})\n${styleByPreset[preset]}\n${teaser}`;
 }
 
 function buildFinalPrompt(preset: PresetKey, niche: NicheKey, main: string, extra: string): string {
+  // If empty scene, avoid generating a "fake complete" prompt
+  const scene = main.trim();
   const blocks: string[] = [];
+
   blocks.push(`PRESET:\n${PRESET_TEXT[preset]}`);
   blocks.push(`NICHE:\n${NICHE_TEXT[niche]}`);
-  blocks.push(`SCENE:\n${main.trim() || '(empty)'}`);
+
+  blocks.push(`SCENE:\n${scene ? scene : '[EMPTY] (Write Prompt Utama first)'}`);
+
   if (extra.trim()) blocks.push(`EXTRA:\n${extra.trim()}`);
 
   blocks.push(
     `OUTPUT RULES:\n9:16 vertical, 10–15 seconds, realistic lighting, clean composition, clear subject, safe content, avoid extreme gore, avoid medical claims.`
   );
+
+  // Important: Collab + Sweepy safety guard
+  if (preset === 'sweepy' || preset === 'collab') {
+    blocks.push(
+      `ANATOMY GUARD:\nSweepy must remain a real monkey: animal anatomy, animal movement. NO human hands/face, NOT a person in a costume, NOT anthropomorphic.`
+    );
+  }
 
   return blocks.join('\n\n');
 }
@@ -259,13 +343,13 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-// ====== UI styles (inline) - biar aman meski CSS/tailwind beda-beda ======
+// ====== UI styles (inline) ======
 const ui = {
   page: {
     minHeight: '100vh',
     background: '#0b0f16',
     color: 'rgba(255,255,255,0.92)',
-    padding: '18px 14px 80px',
+    padding: '18px 14px 86px',
     position: 'relative' as const,
     fontFamily:
       'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
@@ -286,8 +370,8 @@ const ui = {
     position: 'relative' as const,
   },
   header: { padding: '6px 6px 2px' },
-  title: { margin: 0, fontSize: 28, fontWeight: 900, letterSpacing: 0.2 },
-  subtitle: { margin: '8px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.68)' },
+  title: { margin: 0, fontSize: 28, fontWeight: 950, letterSpacing: 0.2 },
+  subtitle: { margin: '8px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.68)', lineHeight: 1.35 },
   card: {
     borderRadius: 22,
     border: '1px solid rgba(255,255,255,0.10)',
@@ -302,14 +386,14 @@ const ui = {
     justifyContent: 'space-between',
     gap: 10,
   },
-  cardTitle: { fontSize: 16, fontWeight: 900, margin: 0 },
+  cardTitle: { fontSize: 16, fontWeight: 950, margin: 0 },
   hint: { marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.60)', lineHeight: 1.35 },
   chips: { display: 'flex', flexWrap: 'wrap' as const, gap: 10, marginTop: 12 },
   chip: (active: boolean) => ({
     borderRadius: 999,
     padding: '10px 14px',
     fontSize: 14,
-    fontWeight: 800,
+    fontWeight: 900,
     border: active ? '1px solid rgba(53,211,154,0.45)' : '1px solid rgba(255,255,255,0.12)',
     background: active ? 'rgba(53,211,154,0.18)' : 'rgba(255,255,255,0.06)',
     color: 'rgba(255,255,255,0.92)',
@@ -319,32 +403,42 @@ const ui = {
     borderRadius: 999,
     padding: '10px 14px',
     fontSize: 14,
-    fontWeight: 800,
+    fontWeight: 900,
     border: active ? '1px solid rgba(56,189,248,0.55)' : '1px solid rgba(255,255,255,0.12)',
     background: active ? 'rgba(56,189,248,0.20)' : 'rgba(255,255,255,0.06)',
     color: 'rgba(255,255,255,0.92)',
     cursor: 'pointer',
   }),
-  btn: (variant: 'primary' | 'ghost') => ({
+  btnGhost: {
     borderRadius: 999,
     padding: '10px 14px',
     fontSize: 13,
     fontWeight: 900,
-    border: variant === 'ghost' ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(53,211,154,0.35)',
-    background: variant === 'ghost' ? 'rgba(255,255,255,0.06)' : 'rgba(53,211,154,0.20)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'rgba(255,255,255,0.06)',
     color: 'rgba(255,255,255,0.92)',
     cursor: 'pointer',
-  }),
-  btnSolid: {
+  },
+  btnSolid: (disabled?: boolean) => ({
     borderRadius: 999,
     padding: '10px 14px',
     fontSize: 13,
     fontWeight: 950,
     border: '1px solid rgba(53,211,154,0.35)',
-    background: 'rgba(53,211,154,0.85)',
-    color: '#0b0f16',
-    cursor: 'pointer',
-  },
+    background: disabled ? 'rgba(255,255,255,0.10)' : 'rgba(53,211,154,0.85)',
+    color: disabled ? 'rgba(255,255,255,0.55)' : '#0b0f16',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+  }),
+  btnSoft: (disabled?: boolean) => ({
+    borderRadius: 999,
+    padding: '10px 14px',
+    fontSize: 13,
+    fontWeight: 950,
+    border: '1px solid rgba(255,255,255,0.12)',
+    background: disabled ? 'rgba(255,255,255,0.06)' : 'rgba(53,211,154,0.20)',
+    color: disabled ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.92)',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+  }),
   box: {
     marginTop: 12,
     borderRadius: 18,
@@ -370,16 +464,15 @@ const ui = {
     resize: 'vertical' as const,
   },
   pill: {
-    display: 'inline-block',
+    display: 'inline-flex',
+    alignItems: 'center',
     borderRadius: 999,
     padding: '6px 10px',
     fontSize: 12,
-    fontWeight: 800,
+    fontWeight: 900,
     border: '1px solid rgba(255,255,255,0.10)',
     background: 'rgba(255,255,255,0.06)',
-    color: 'rgba(255,255,255,0.80)',
-    marginRight: 8,
-    marginTop: 8,
+    color: 'rgba(255,255,255,0.82)',
   },
   list: { display: 'grid', gap: 10, marginTop: 12 },
   listItem: {
@@ -461,13 +554,13 @@ export default function Page() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(LS_HISTORY, JSON.stringify(history.slice(0, 50)));
+      localStorage.setItem(LS_HISTORY, JSON.stringify(history.slice(0, 60)));
     } catch {}
   }, [history]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(LS_SAVED, JSON.stringify(saved.slice(0, 50)));
+      localStorage.setItem(LS_SAVED, JSON.stringify(saved.slice(0, 60)));
     } catch {}
   }, [saved]);
 
@@ -476,6 +569,8 @@ export default function Page() {
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(''), 1700);
   }
+
+  const canUse = main.trim().length > 0;
 
   const finalPrompt = useMemo(() => {
     return buildFinalPrompt(preset, niche, main, extra);
@@ -486,7 +581,6 @@ export default function Page() {
   const captionBlock = useMemo(() => `${caption}\n\n${hashtags.join(' ')}`, [caption, hashtags]);
 
   function pushHistory() {
-    // History disimpan saat copy (biar ringkas)
     const item: HistoryItem = {
       id: uid(),
       ts: Date.now(),
@@ -498,10 +592,11 @@ export default function Page() {
       caption,
       hashtags,
     };
-    setHistory((prev) => [item, ...prev].slice(0, 50));
+    setHistory((prev) => [item, ...prev].slice(0, 60));
   }
 
   async function onCopyPrompt() {
+    if (!canUse) return;
     const ok = await copyToClipboard(finalPrompt);
     if (ok) {
       pushHistory();
@@ -510,6 +605,7 @@ export default function Page() {
   }
 
   async function onCopyCaption() {
+    if (!canUse) return;
     const ok = await copyToClipboard(captionBlock);
     if (ok) {
       pushHistory();
@@ -519,10 +615,13 @@ export default function Page() {
 
   function onAutoGenerate() {
     // ✅ mengikuti niche & preset, tapi tidak mengubah pilihan user
-    const idea = IDEAS[niche]?.length ? IDEAS[niche][Math.floor(Math.random() * IDEAS[niche].length)] : null;
-    if (!idea) return;
+    const all = IDEAS[niche] || [];
+    const filtered = all.filter((x) => !x.presets || x.presets.includes(preset));
+    const pool = filtered.length ? filtered : all;
 
-    // Ide netral, preset yang “menghidupkan” karakter via preset text di final prompt.
+    if (!pool.length) return;
+
+    const idea = pickFromPool(pool);
     setMain(idea.main);
     setExtra(idea.extra);
     showToast('Auto generated ✨');
@@ -537,7 +636,7 @@ export default function Page() {
   }
 
   function onSavePrompt() {
-    if (!main.trim()) {
+    if (!canUse) {
       showToast('Isi Prompt Utama dulu');
       return;
     }
@@ -563,7 +662,7 @@ export default function Page() {
       data,
     };
 
-    setSaved((prev) => [item, ...prev].slice(0, 50));
+    setSaved((prev) => [item, ...prev].slice(0, 60));
     showToast('Saved ✅');
   }
 
@@ -597,7 +696,10 @@ export default function Page() {
 
   const fmtTime = (ts: number) => {
     try {
-      return new Date(ts).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+      return new Date(ts).toLocaleString('id-ID', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
     } catch {
       return '';
     }
@@ -622,26 +724,21 @@ export default function Page() {
               <div style={ui.cardTitle}>Preset Karakter</div>
               <div style={ui.hint}>Pilih siapa yang tampil di video.</div>
             </div>
-            <button style={ui.btn('ghost')} onClick={onClearAll} type="button">
+            <button style={ui.btnGhost} onClick={onClearAll} type="button">
               Clear
             </button>
           </div>
 
           <div style={ui.chips}>
             {(['general', 'hanz', 'sweepy', 'collab'] as PresetKey[]).map((k) => (
-              <button
-                key={k}
-                style={ui.chip(preset === k)}
-                onClick={() => setPreset(k)}
-                type="button"
-              >
+              <button key={k} style={ui.chip(preset === k)} onClick={() => setPreset(k)} type="button">
                 {PRESET_LABEL[k]}
               </button>
             ))}
           </div>
 
           <div style={ui.box}>
-            <b style={{ color: 'rgba(255,255,255,0.75)' }}>Preset detail</b>
+            <b style={{ color: 'rgba(255,255,255,0.78)' }}>Preset detail</b>
             {'\n'}
             {PRESET_TEXT[preset]}
           </div>
@@ -655,29 +752,28 @@ export default function Page() {
               <div style={ui.hint}>Pilih tema konten. Auto Generate mengikuti niche ini (tidak mengubah preset/niche).</div>
             </div>
 
-            {/* Auto Generate button: kanan atas box niche */}
-            <button style={ui.btnSolid} onClick={onAutoGenerate} type="button">
+            {/* Auto Generate button (right top niche box) */}
+            <button style={ui.btnSolid(false)} onClick={onAutoGenerate} type="button">
               Auto Generate
             </button>
           </div>
 
           <div style={ui.chips}>
             {(['daily', 'lucu', 'kesehatan', 'ugc', 'horror'] as NicheKey[]).map((k) => (
-              <button
-                key={k}
-                style={ui.chipBlue(niche === k)}
-                onClick={() => setNiche(k)}
-                type="button"
-              >
+              <button key={k} style={ui.chipBlue(niche === k)} onClick={() => setNiche(k)} type="button">
                 {NICHE_LABEL[k]}
               </button>
             ))}
           </div>
 
           <div style={ui.box}>
-            <b style={{ color: 'rgba(255,255,255,0.75)' }}>Niche guide</b>
+            <b style={{ color: 'rgba(255,255,255,0.78)' }}>Niche guide</b>
             {'\n'}
             {NICHE_TEXT[niche]}
+            {'\n\n'}
+            <span style={{ color: 'rgba(255,255,255,0.55)' }}>
+              Catatan: Auto Generate akan pilih ide yang cocok dengan preset yang kamu pilih (Hanz/Sweepy/Collab).
+            </span>
           </div>
         </section>
 
@@ -690,7 +786,7 @@ export default function Page() {
             rows={5}
             value={main}
             onChange={(e) => setMain(e.target.value)}
-            placeholder="Contoh: @hanz26 lagi jalan santai sore, Sweepy muncul tiba-tiba bawa benda kecil lucu, Hanz reaksi tenang..."
+            placeholder='Contoh: "@hanz26 duduk rapi minum kopi, Sweepy datang penasaran dan ambil benda kecil lucu, Hanz menatap tenang lalu tersenyum..."'
           />
         </section>
 
@@ -713,7 +809,7 @@ export default function Page() {
               <div style={ui.cardTitle}>Final Prompt</div>
               <div style={ui.hint}>Gabungan preset + niche + prompt manual + extra.</div>
             </div>
-            <button style={ui.btn('ghost')} onClick={onSavePrompt} type="button">
+            <button style={ui.btnGhost} onClick={onSavePrompt} type="button" disabled={!canUse}>
               Save Prompt
             </button>
           </div>
@@ -721,22 +817,29 @@ export default function Page() {
           <div style={ui.box}>{finalPrompt}</div>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
-            <button style={ui.btnSolid} onClick={onCopyPrompt} type="button">
+            <button style={ui.btnSolid(!canUse)} onClick={onCopyPrompt} type="button" disabled={!canUse}>
               Copy Prompt
             </button>
-            <button style={ui.btn('primary')} onClick={onCopyCaption} type="button">
+            <button style={ui.btnSoft(!canUse)} onClick={onCopyCaption} type="button" disabled={!canUse}>
               Copy Caption + Hashtag
             </button>
           </div>
+
+          {!canUse ? (
+            <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+              Isi <b>Prompt Utama</b> dulu supaya Copy/Save aktif.
+            </div>
+          ) : null}
         </section>
 
         <section style={ui.card}>
           <div style={ui.cardTitle}>Caption + 5 Hashtags</div>
-          <div style={ui.hint}>Kamu bisa copy lalu edit gaya bahasa sesukamu.</div>
+          <div style={ui.hint}>Copy sekali tap. Hashtag sekarang tampil rapi (tidak nempel).</div>
 
           <div style={ui.box}>{captionBlock}</div>
 
-          <div style={{ marginTop: 10 }}>
+          {/* ✅ FIX: use flex + gap so hashtags never “stick” */}
+          <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {hashtags.map((h) => (
               <span key={h} style={ui.pill}>
                 {h}
@@ -752,7 +855,7 @@ export default function Page() {
               <div style={ui.cardTitle}>Saved Prompts</div>
               <div style={ui.hint}>Disimpan manual lewat tombol “Save Prompt”.</div>
             </div>
-            <button style={ui.btn('ghost')} onClick={clearSaved} type="button" disabled={!saved.length}>
+            <button style={ui.btnGhost} onClick={clearSaved} type="button" disabled={!saved.length}>
               Clear Saved
             </button>
           </div>
@@ -790,7 +893,7 @@ export default function Page() {
               <div style={ui.cardTitle}>History</div>
               <div style={ui.hint}>Tersimpan otomatis saat kamu Copy Prompt/Caption.</div>
             </div>
-            <button style={ui.btn('ghost')} onClick={clearHistory} type="button" disabled={!history.length}>
+            <button style={ui.btnGhost} onClick={clearHistory} type="button" disabled={!history.length}>
               Clear History
             </button>
           </div>
@@ -833,3 +936,4 @@ export default function Page() {
     </main>
   );
 }
+```0
