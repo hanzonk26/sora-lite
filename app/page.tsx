@@ -24,8 +24,8 @@ type SavedItem = {
   data: HistoryItem;
 };
 
-const LS_HISTORY = 'sora_lite_history_v6';
-const LS_SAVED = 'sora_lite_saved_v6';
+const LS_HISTORY = 'sora_lite_history_v7';
+const LS_SAVED = 'sora_lite_saved_v7';
 
 const PRESET_LABEL: Record<PresetKey, string> = {
   general: 'General',
@@ -71,158 +71,195 @@ const NICHE_TEXT: Record<NicheKey, string> = {
     'Safe horror tone: suspense, eerie ambience, low-key lighting. NO extreme gore, non-graphic, safe twist ending.',
 };
 
-// ====== Auto ideas: now slightly tailored per preset ======
-type Idea = { main: string; extra: string; presets?: PresetKey[] };
+// ====== Viral Dynamic Slots ======
+const SLOT = {
+  // universal
+  cameraBase: [
+    '9:16 vertical',
+    '10–15 seconds',
+    'realistic lighting',
+    'clean composition',
+    'clear subject',
+    'phone-friendly framing',
+  ],
+  cameraShorts: [
+    'handheld phone feel',
+    'reaction close-up',
+    'quick cut 0.3s',
+    'slight camera shake',
+    'slow push-in',
+    'wide establishing shot',
+    'detail texture shot',
+    'cut on action',
+  ],
+  // For all presets: popular settings by niche
+  setting: {
+    daily: [
+      'pagi di kamar yang rapi (soft window light)',
+      'sore di teras rumah (golden hour)',
+      'di meja kerja minimalis',
+      'di minimarket dekat rumah',
+      'di kafe outdoor yang tenang',
+      'di jalan kecil perumahan (golden hour)',
+    ],
+    lucu: [
+      'di ruang tamu',
+      'di kamar rapi',
+      'di dapur',
+      'di halaman rumah',
+      'di parkiran minimarket',
+    ],
+    kesehatan: [
+      'di ruang tamu (stretching corner)',
+      'di teras rumah',
+      'di meja dapur (snack sehat)',
+      'di taman kecil',
+      'di area kerja (break 5 menit)',
+    ],
+    ugc: [
+      'depan jendela (natural light)',
+      'di meja kerja (setup sederhana)',
+      'di kamar (UGC vibe)',
+      'di teras rumah',
+      'di dekat rak barang/produk',
+    ],
+    horror: [
+      'di lorong rumah yang redup',
+      'di kamar dengan lampu kecil',
+      'di ruang TV gelap',
+      'di dapur malam hari',
+      'di depan pintu yang setengah terbuka',
+    ],
+  } as Record<NicheKey, string[]>,
 
-const IDEAS: Record<NicheKey, Idea[]> = {
-  daily: [
-    // Neutral
-    {
-      main: 'Rutinitas pagi yang rapi: rapihin outfit, cek barang bawaan, bikin kopi/teh, lalu siap berangkat. Fokus momen kecil yang estetik.',
-      extra:
-        'soft morning light, slow pans, clean background, subtle b-roll details, 10–15s, 9:16',
-    },
-    // Hanz
-    {
-      presets: ['hanz'],
-      main: 'Outfit check: karakter tampil santai tapi modis, merapikan kerah/jaket, lalu jalan keluar rumah dengan vibe tenang dan rapi.',
-      extra:
-        'phone-friendly fashion b-roll, close-up fabric details, calm pacing, natural daylight, clean background',
-    },
-    // Sweepy
-    {
-      presets: ['sweepy'],
-      main: 'Monyet kecil penasaran: Sweepy memeriksa sekitar rumah/halaman, mengendus benda kecil, lalu “menyusun” benda dengan cara monyet (animal-like).',
-      extra:
-        'real monkey movement, playful curiosity, close-up paws, natural outdoor light, no human gestures',
-    },
-    // Collab
-    {
-      presets: ['collab'],
-      main: 'Kolab santai: @hanz26 duduk rapi minum kopi, Sweepy datang penasaran, mengambil benda kecil, @hanz26 menatap tenang lalu tersenyum.',
-      extra:
-        'calm lifestyle vibe, soft daylight, reaction shots, safe interaction, monkey stays animal-like',
-    },
+  // Niche actions (viral patterns)
+  action: {
+    daily: [
+      'rapihin outfit dan cek penampilan',
+      'bikin kopi/teh dengan tenang',
+      'beresin meja kerja biar clean',
+      'packing barang kecil ke tas',
+      'jalan santai sambil menikmati suasana',
+    ],
+    lucu: [
+      'mau bikin konten serius tapi ke-distract hal receh',
+      'ngulang take karena ada kejadian kocak',
+      'berusaha tampil rapi tapi ada detail yang bikin gagal lucu',
+      'salah paham instruksi sederhana',
+    ],
+    kesehatan: [
+      'ngasih 3 reminder sehat yang ringan',
+      'stretching 3 gerakan aman',
+      'bikin snack sehat sederhana',
+      'break 5 menit: minum air + jalan kecil',
+    ],
+    ugc: [
+      'review singkat: masalah → solusi → manfaat',
+      'demo cepat: 2 poin penting + CTA halus',
+      'before/after yang realistis (tanpa klaim lebay)',
+      'daily recommendation singkat',
+    ],
+    horror: [
+      'dengar suara kecil dan menoleh pelan',
+      'lihat bayangan bergerak di dinding',
+      'kamera pelan mendekat ke pintu',
+      'TV gelap seolah ada silhouette',
+    ],
+  } as Record<NicheKey, string[]>,
+
+  // Popular twists by niche (shareable)
+  twist: {
+    daily: [
+      'ending: senyum kecil dan lanjut aktivitas',
+      'ending: close-up detail outfit/benda lalu cut',
+      'ending: ambience shot satisfying 1 detik',
+      'ending: text overlay singkat yang relatable',
+    ],
+    lucu: [
+      'twist: ternyata sumber gangguan itu benda sepele',
+      'twist: karakter menahan ketawa lalu pecah ketawa',
+      'twist: “yaudah ulang lagi” dengan ekspresi pasrah',
+      'twist: freeze frame tepat di momen lucu',
+    ],
+    kesehatan: [
+      'twist: reminder “pelan-pelan yang penting konsisten”',
+      'twist: overlay “bukan nasihat medis, kalau ragu tanya profesional”',
+      'twist: ajak komentar kebiasaan sehat favorit',
+    ],
+    ugc: [
+      'twist: “jujur ini yang paling kepake sehari-hari”',
+      'twist: “kamu tim A atau tim B?”',
+      'twist: CTA halus: “mau aku bikin versi detail?”',
+      'twist: quick b-roll montage 3 beat lalu cut',
+    ],
+    horror: [
+      'twist aman: ternyata angin/kipas/barang jatuh',
+      'twist aman: cuma pantulan lampu',
+      'twist aman: orang lewat di luar jendela',
+      'twist aman: suara notifikasi hp',
+    ],
+  } as Record<NicheKey, string[]>,
+
+  // Preset flavor lines
+  flavor: {
+    general: [
+      'vibe natural dan simple',
+      'original feel, relatable',
+      'clean aesthetic, minimal',
+    ],
+    hanz: [
+      '@hanz26 tenang, rapi, modis',
+      'gesture minimal, ekspresi calm',
+      'fashion-lifestyle vibe yang soft',
+    ],
+    sweepy: [
+      'Sweepy monyet kecil animal-like, pintar & lucu',
+      'gerakan monyet asli, tanpa gestur manusia',
+      'ekspresi hewan yang natural',
+    ],
+    collab: [
+      'kolab aman: @hanz26 tenang + Sweepy monyet (animal-only)',
+      'kontras viral: calm human vs chaotic monkey (safe)',
+      'interaksi natural, wholesome, shareable',
+    ],
+  } as Record<PresetKey, string[]>,
+
+  // Collab-specific viral structure blocks
+  collabAction: [
+    '@hanz26 duduk tenang siap rekam konten',
+    '@hanz26 lagi fokus ke kamera dengan ekspresi kalem',
+    '@hanz26 merapikan outfit sebelum take',
+    '@hanz26 duduk santai sambil minum kopi',
+    '@hanz26 cek kamera lalu mulai rekam',
   ],
-  lucu: [
-    // Neutral
-    {
-      main: 'Karakter mencoba bikin konten serius, tapi selalu ada gangguan kecil yang absurd (benda jatuh, suara random, kipas angin). Ending: ketawa dan ulang take.',
-      extra:
-        'quick reaction cuts, comedic timing, punchline ending, wholesome, safe',
-    },
-    // Hanz
-    {
-      presets: ['hanz'],
-      main: '@hanz26 mau tampil rapi, tapi detail kecil selalu bikin lucu (kerah balik, rambut tertiup, barang nyangkut). Reaksi tetap tenang tapi akhirnya ketawa.',
-      extra:
-        'subtle comedy, calm reactions, quick cutaways, phone camera vibe, safe humor',
-    },
-    // Sweepy
-    {
-      presets: ['sweepy'],
-      main: 'Sweepy (monyet kecil) mencoba meniru rutinitas manusia dengan cara monyet: ambil sisir, lalu malah menyisir benda lain. Lucu tapi tetap animal-like.',
-      extra:
-        'real monkey behavior, playful confusion, comedic beats, no human hands/face, safe',
-    },
-    // Collab
-    {
-      presets: ['collab'],
-      main: '@hanz26 lagi rekam konten tenang, Sweepy tiba-tiba muncul “nyolong” properti kecil. @hanz26 menahan ketawa, lalu memberi isyarat pelan—Sweepy kabur.',
-      extra:
-        'comedic timing, reaction shots, safe playful chase, monkey stays animal-like',
-    },
+  monkeyAction: [
+    'Sweepy muncul pelan dari samping meja',
+    'Sweepy mengambil properti kecil tanpa disadari',
+    'Sweepy penasaran lalu menyentuh benda penting',
+    'Sweepy duduk sebentar lalu bergerak cepat',
+    'Sweepy muncul di frame lalu menghilang',
+    'Sweepy “nyolong” benda kecil lalu kabur pelan',
   ],
-  kesehatan: [
-    // Neutral
-    {
-      main: 'Tips 3 kebiasaan sehat yang gampang: minum air, jalan 5–10 menit, tidur lebih cepat. Singkat, jelas, tanpa klaim berlebihan.',
-      extra:
-        'friendly tone, clean overlays, calm pacing, no medical claims, 10–15s',
-    },
-    // Hanz
-    {
-      presets: ['hanz'],
-      main: '@hanz26 memberi reminder sehat versi santai: minum air + jalan sebentar setelah duduk lama. Bahasa ringan, vibe tenang.',
-      extra:
-        'talk-to-camera calm, minimal gestures, clean background, simple overlay text',
-    },
-    // Sweepy (still animal-like; health content as “habit reminder” with playful monkey actions)
-    {
-      presets: ['sweepy'],
-      main: 'Sweepy membawa botol air kecil (prop) dan duduk sejenak “istirahat”, lalu bergerak aktif sebentar. Pesan: minum & gerak ringan.',
-      extra:
-        'animal-like movement, cute but realistic, simple overlays, safe, no medical claims',
-    },
-    // Collab
-    {
-      presets: ['collab'],
-      main: '@hanz26 mengajak kebiasaan sehat ringan (minum air + jalan 5 menit). Sweepy muncul dan ikut bergerak kecil (tetap monyet).',
-      extra:
-        'friendly and calm, short b-roll, safe interaction, no medical claims',
-    },
+  reaction: [
+    '@hanz26 melirik pelan tanpa panik',
+    '@hanz26 menahan senyum',
+    '@hanz26 berhenti bicara sejenak',
+    '@hanz26 menarik napas kecil',
+    '@hanz26 pasrah lalu tersenyum',
   ],
-  ugc: [
-    // Neutral
-    {
-      main: 'UGC review singkat: hook 2 detik, masalahnya apa, solusi singkat, 2 manfaat, CTA halus. Natural dan jujur.',
-      extra:
-        'handheld phone, talk-to-camera, quick b-roll inserts, authentic tone, 10–15s',
-    },
-    // Hanz (UGC style but calm & neat)
-    {
-      presets: ['hanz'],
-      main: '@hanz26 UGC santai: “Ini yang aku suka / yang perlu kamu tahu” dalam 3 poin cepat. Tampil rapi, nada tenang.',
-      extra:
-        'phone camera, calm voice vibe, clean b-roll, close-up details, minimal hype',
-    },
-    // Sweepy (UGC without human talk; more “visual demo”)
-    {
-      presets: ['sweepy'],
-      main: 'Sweepy mendemokan benda sederhana dengan cara monyet (misal membuka, mengetuk, menyusun). Fokus visual yang jelas, tanpa dialog manusia.',
-      extra:
-        'clear close-ups, animal-like actions, simple overlays, safe, no human-like gestures',
-    },
-    // Collab
-    {
-      presets: ['collab'],
-      main: '@hanz26 menjelaskan 2 poin singkat, lalu Sweepy menunjukkan demo visual (tetap monyet). Ending: @hanz26 senyum dan CTA halus.',
-      extra:
-        'talk-to-camera + b-roll demo, safe interaction, clean framing, 9:16',
-    },
-  ],
-  horror: [
-    // Neutral
-    {
-      main: 'Ruangan sunyi, terdengar suara pelan dari arah pintu. Kamera pelan mendekat… twist ending: cuma angin/barang jatuh.',
-      extra:
-        'low-key lighting, eerie ambience, slow push-in, safe non-graphic reveal',
-    },
-    // Hanz (safe horror + calm reaction)
-    {
-      presets: ['hanz'],
-      main: '@hanz26 di ruangan redup, mendengar suara kecil. Dia menoleh pelan, suspense naik… twist: cuma benda tergeser. Reaksi: tenang + lega.',
-      extra:
-        'cinematic suspense, soft grain, controlled camera shake, no gore, safe',
-    },
-    // Sweepy (safe horror with monkey curiosity)
-    {
-      presets: ['sweepy'],
-      main: 'Sweepy melihat bayangan bergerak di dinding, mendekat dengan rasa penasaran (monyet). Twist: pantulan kipas/lampu. Sweepy kabur lucu.',
-      extra:
-        'eerie ambience but playful, safe twist, animal-like movement, no gore',
-    },
-    // Collab
-    {
-      presets: ['collab'],
-      main: '@hanz26 menyalakan lampu kecil, Sweepy mendengar suara dan ikut mendekat (tetap monyet). Twist: hanya tirai tertiup angin. Ending: mereka lega.',
-      extra:
-        'safe suspense, low-key lighting, reaction shots, non-graphic, 10–15s',
-    },
+  collabEnding: [
+    'ending: @hanz26 tersenyum ke kamera, Sweepy kabur',
+    'ending: freeze frame + senyum kecil',
+    'ending: kamera cut tepat sebelum chaos',
+    'ending: text overlay “yaudah ulang lagi”',
+    'ending: kamera bergoyang dikit lalu cut',
   ],
 };
 
-// ====== helpers ======
+function pick<T>(arr: T[]) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 function uid() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
@@ -234,10 +271,6 @@ function safeParse<T>(raw: string | null, fallback: T): T {
   } catch {
     return fallback;
   }
-}
-
-function pickFromPool(arr: Idea[]) {
-  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 function uniqueTop5(arr: string[]): string[] {
@@ -271,7 +304,6 @@ function buildHashtags(preset: PresetKey, niche: NicheKey): string[] {
     collab: ['#hanz26', '#sweepy'],
   };
 
-  // Force base tags to be present
   const merged = ['#sora', '#aivideo', ...baseByNiche[niche], ...presetTags[preset]];
   return uniqueTop5(merged);
 }
@@ -302,29 +334,25 @@ function buildCaption(preset: PresetKey, niche: NicheKey, main: string): string 
   };
 
   const teaser = main.trim()
-    ? main.trim().slice(0, 110) + (main.trim().length > 110 ? '…' : '')
+    ? main.trim().slice(0, 120) + (main.trim().length > 120 ? '…' : '')
     : 'Isi prompt utama dulu untuk hasil terbaik.';
 
   return `${vibeByNiche[niche]} (${who})\n${styleByPreset[preset]}\n${teaser}`;
 }
 
 function buildFinalPrompt(preset: PresetKey, niche: NicheKey, main: string, extra: string): string {
-  // If empty scene, avoid generating a "fake complete" prompt
   const scene = main.trim();
   const blocks: string[] = [];
 
   blocks.push(`PRESET:\n${PRESET_TEXT[preset]}`);
   blocks.push(`NICHE:\n${NICHE_TEXT[niche]}`);
-
   blocks.push(`SCENE:\n${scene ? scene : '[EMPTY] (Write Prompt Utama first)'}`);
-
   if (extra.trim()) blocks.push(`EXTRA:\n${extra.trim()}`);
 
   blocks.push(
     `OUTPUT RULES:\n9:16 vertical, 10–15 seconds, realistic lighting, clean composition, clear subject, safe content, avoid extreme gore, avoid medical claims.`
   );
 
-  // Important: Collab + Sweepy safety guard
   if (preset === 'sweepy' || preset === 'collab') {
     blocks.push(
       `ANATOMY GUARD:\nSweepy must remain a real monkey: animal anatomy, animal movement. NO human hands/face, NOT a person in a costume, NOT anthropomorphic.`
@@ -341,6 +369,53 @@ async function copyToClipboard(text: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ====== Viral Dynamic Idea Builder (works for ALL niche, BEST for collab) ======
+function buildDynamicIdea(niche: NicheKey, preset: PresetKey): { main: string; extra: string } {
+  // Collab gets special viral structure
+  if (preset === 'collab') {
+    const s = pick(SLOT.setting[niche]); // niche-specific setting
+    const a = pick(SLOT.collabAction);
+    const m = pick(SLOT.monkeyAction);
+    const r = pick(SLOT.reaction);
+    const e = pick(SLOT.collabEnding);
+    const br = [pick(SLOT.cameraShorts), pick(SLOT.cameraShorts), pick(SLOT.cameraShorts)];
+
+    const safe = niche === 'horror'
+      ? 'safe suspense, non-graphic, twist ending, no gore'
+      : niche === 'kesehatan'
+        ? 'no medical claims, practical habits only'
+        : niche === 'ugc'
+          ? 'authentic UGC pacing, benefit-first'
+          : niche === 'lucu'
+            ? 'wholesome humor, punchline timing'
+            : 'calm daily vibe';
+
+    return {
+      main: `Di ${s}, ${a}. ${m}. ${r}. ${pick(SLOT.twist[niche])}. ${e}.`,
+      extra: `${br.join(', ')}, ${SLOT.cameraBase.join(', ')}, ${safe}, safe interaction, monkey remains animal-like`,
+    };
+  }
+
+  // Non-collab: still dynamic and viral-ish
+  const s = pick(SLOT.setting[niche]);
+  const a = pick(SLOT.action[niche]);
+  const t = pick(SLOT.twist[niche]);
+  const f = pick(SLOT.flavor[preset]);
+  const br = [pick(SLOT.cameraShorts), pick(SLOT.cameraShorts)];
+
+  const addGuard =
+    preset === 'sweepy'
+      ? 'monkey stays animal-like, no human gestures'
+      : preset === 'hanz'
+        ? 'calm neat style, minimal gestures'
+        : 'natural';
+
+  return {
+    main: `Di ${s}, karakter ${a}. ${t}. (${f})`,
+    extra: `${br.join(', ')}, ${SLOT.cameraBase.join(', ')}, ${addGuard}`,
+  };
 }
 
 // ====== UI styles (inline) ======
@@ -548,17 +623,20 @@ export default function Page() {
   const toastTimer = useRef<number | null>(null);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     setHistory(safeParse<HistoryItem[]>(localStorage.getItem(LS_HISTORY), []));
     setSaved(safeParse<SavedItem[]>(localStorage.getItem(LS_SAVED), []));
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(LS_HISTORY, JSON.stringify(history.slice(0, 60)));
     } catch {}
   }, [history]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(LS_SAVED, JSON.stringify(saved.slice(0, 60)));
     } catch {}
@@ -572,10 +650,7 @@ export default function Page() {
 
   const canUse = main.trim().length > 0;
 
-  const finalPrompt = useMemo(() => {
-    return buildFinalPrompt(preset, niche, main, extra);
-  }, [preset, niche, main, extra]);
-
+  const finalPrompt = useMemo(() => buildFinalPrompt(preset, niche, main, extra), [preset, niche, main, extra]);
   const caption = useMemo(() => buildCaption(preset, niche, main), [preset, niche, main]);
   const hashtags = useMemo(() => buildHashtags(preset, niche), [preset, niche]);
   const captionBlock = useMemo(() => `${caption}\n\n${hashtags.join(' ')}`, [caption, hashtags]);
@@ -614,14 +689,7 @@ export default function Page() {
   }
 
   function onAutoGenerate() {
-    // ✅ mengikuti niche & preset, tapi tidak mengubah pilihan user
-    const all = IDEAS[niche] || [];
-    const filtered = all.filter((x) => !x.presets || x.presets.includes(preset));
-    const pool = filtered.length ? filtered : all;
-
-    if (!pool.length) return;
-
-    const idea = pickFromPool(pool);
+    const idea = buildDynamicIdea(niche, preset);
     setMain(idea.main);
     setExtra(idea.extra);
     showToast('Auto generated ✨');
@@ -696,10 +764,7 @@ export default function Page() {
 
   const fmtTime = (ts: number) => {
     try {
-      return new Date(ts).toLocaleString('id-ID', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      });
+      return new Date(ts).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
     } catch {
       return '';
     }
@@ -752,7 +817,6 @@ export default function Page() {
               <div style={ui.hint}>Pilih tema konten. Auto Generate mengikuti niche ini (tidak mengubah preset/niche).</div>
             </div>
 
-            {/* Auto Generate button (right top niche box) */}
             <button style={ui.btnSolid(false)} onClick={onAutoGenerate} type="button">
               Auto Generate
             </button>
@@ -772,7 +836,7 @@ export default function Page() {
             {NICHE_TEXT[niche]}
             {'\n\n'}
             <span style={{ color: 'rgba(255,255,255,0.55)' }}>
-              Catatan: Auto Generate akan pilih ide yang cocok dengan preset yang kamu pilih (Hanz/Sweepy/Collab).
+              Catatan: Auto Generate sekarang pakai “viral dynamic slots” biar nggak monoton dan cocok untuk collab.
             </span>
           </div>
         </section>
@@ -832,13 +896,13 @@ export default function Page() {
           ) : null}
         </section>
 
+        {/* CAPTION */}
         <section style={ui.card}>
           <div style={ui.cardTitle}>Caption + 5 Hashtags</div>
-          <div style={ui.hint}>Copy sekali tap. Hashtag sekarang tampil rapi (tidak nempel).</div>
+          <div style={ui.hint}>Copy sekali tap. Hashtag tampil rapi (tidak nempel).</div>
 
           <div style={ui.box}>{captionBlock}</div>
 
-          {/* ✅ FIX: use flex + gap so hashtags never “stick” */}
           <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {hashtags.map((h) => (
               <span key={h} style={ui.pill}>
