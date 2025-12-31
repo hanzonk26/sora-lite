@@ -1,8 +1,8 @@
-import "./globals.css";
+import './globals.css';
 
 export const metadata = {
-  title: "Sora Lite",
-  description: "Personal AI video practice",
+  title: 'Sora Lite',
+  description: 'Personal AI video practice',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
