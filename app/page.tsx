@@ -3,19 +3,21 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * Sora Lite - page.tsx (FULL REPLACE)
+ * Sora Lite - page.tsx (FULL REPLACE) — SOFT BLUE THEME
  * - Niche rebuilt:
  *   1) UGC Story Telling
  *   2) Kesehatan
  *   3) Trik Sulap
  *   4) Lucu (KHUSUS COLAB @hanz26 x Sweepy) -> auto-generate ALWAYS new
  * - Rules:
- *   - Sweepy only appears in niche "Lucu (Hanz x Sweepy)"
- *   - Auto generate injects randomness blocks & avoids repeating last output
+ *   - Sweepy only appears in niche "Lucu (Hanz x Sweepy)" (enforced)
+ *   - Auto generate injects randomness & avoids repeating last output
  * - UX:
  *   - Copy/Save disabled until Prompt Utama filled
- *   - Caption + 5 hashtags: single clean output (no duplicated raw line)
+ *   - Caption + 5 hashtags: single clean output
  *   - Save Prompts + History stored in localStorage
+ * - Theme:
+ *   - Dark glass + soft blue accents (mobile friendly)
  */
 
 type NicheKey = "ugc_story" | "kesehatan" | "sulap" | "lucu_colab";
@@ -204,7 +206,6 @@ function generateCaptionAndHashtags(niche: NicheKey) {
 /** ---------- Prompt Builders ---------- */
 
 function baseVideoSpec() {
-  // A small always-changing token to reduce repeats; harmless to Sora prompt.
   const r = Math.random().toString(36).slice(2, 8);
   return [
     "Format: vertical 9:16, UGC social media feel",
@@ -308,7 +309,6 @@ function buildColabFunnyPrompt() {
     "over-the-shoulder shot alternating to reaction shots",
   ]);
 
-  // Hard rule: always both characters + interaction
   return clampText(`
 Funny UGC-style collaboration video.
 Characters: @hanz26 (human) and Sweepy (cute monkey) on screen together, interacting naturally.
@@ -325,9 +325,8 @@ ${baseVideoSpec().join("\n")}
 }
 
 function enforcePresetForNiche(niche: NicheKey, preset: PresetKey): PresetKey {
-  // Sweepy ONLY allowed in lucu_colab via colab preset
   if (niche === "lucu_colab") return "colab";
-  if (preset === "sweepy" || preset === "colab") return "hanz26"; // keep you as default
+  if (preset === "sweepy" || preset === "colab") return "hanz26";
   return preset;
 }
 
@@ -367,7 +366,6 @@ export default function Page() {
   const canCopySave = promptUtama.trim().length > 0;
 
   useEffect(() => {
-    // load LS
     const s = safeParse<SavedPrompt[]>(localStorage.getItem(LS_SAVED), []);
     const h = safeParse<HistoryItem[]>(localStorage.getItem(LS_HISTORY), []);
     setSaved(s);
@@ -375,16 +373,13 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    // if niche changes, enforce preset immediately
     if (effectivePreset !== preset) setPreset(effectivePreset);
-    // also refresh caption/hashtags to match niche
     const ch = generateCaptionAndHashtags(niche);
     setCaption(ch.caption);
     setHashtags(ch.hashtags);
   }, [niche]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    // whenever prompt utama / extra changes -> rebuild final prompt
     const scene = promptUtama.trim() ? promptUtama.trim() : "[EMPTY] (Write Prompt Utama first)";
     const autoBlock = generatePrompt(niche, preset);
     const merged = clampText(`
@@ -411,8 +406,6 @@ ${extra.trim() || "-"}
   }
 
   function doAutoGenerate() {
-    // Always new:
-    // - generate until differs from lastAutoRef OR max attempts
     let out = "";
     for (let i = 0; i < 6; i++) {
       out = generatePrompt(niche, preset);
@@ -420,15 +413,12 @@ ${extra.trim() || "-"}
     }
     lastAutoRef.current = out;
 
-    // Put the generated block into Prompt Utama by default (so user can directly copy/save)
-    // Or if user already typed, we append a short "direction" line.
     if (!promptUtama.trim()) {
       setPromptUtama(out);
     } else {
       setExtra((prev) => clampText(`${prev}\n\n# Auto Variation\n${out}`));
     }
 
-    // add history (store the out)
     const item: HistoryItem = {
       id: uid("hist"),
       niche,
@@ -443,7 +433,6 @@ ${extra.trim() || "-"}
     try {
       await navigator.clipboard.writeText(text);
     } catch {
-      // fallback
       const ta = document.createElement("textarea");
       ta.value = text;
       document.body.appendChild(ta);
@@ -483,20 +472,26 @@ ${extra.trim() || "-"}
     persistHistory([]);
   }
 
+  // ---------- SOFT BLUE THEME CLASSES ----------
   const boxStyle =
-    "border border-neutral-200 rounded-2xl p-4 shadow-sm bg-white/80 backdrop-blur";
+    "border border-blue-900/40 rounded-2xl p-4 shadow-lg bg-blue-950/40 backdrop-blur";
   const btn =
-    "px-3 py-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:scale-[0.99] transition";
+    "px-3 py-2 rounded-xl border border-blue-900/40 hover:bg-blue-900/30 active:scale-[0.99] transition";
   const btnPrimary =
-    "px-3 py-2 rounded-xl bg-black text-white hover:bg-neutral-800 active:scale-[0.99] transition";
-  const label = "text-sm font-medium text-neutral-700";
+    "px-3 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-500 active:scale-[0.99] transition";
+  const label = "text-sm font-medium text-blue-200";
+  const subText = "text-xs text-blue-300/70";
+  const paraText = "text-sm text-blue-300/60";
+
+  const textareaBase =
+    "mt-3 w-full rounded-xl border border-blue-900/40 bg-blue-950/40 p-3 text-sm text-slate-100 outline-none focus:border-blue-400 placeholder:text-blue-300/50";
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-blue-950 text-slate-100">
       <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-4">
         <header className="flex flex-col gap-1">
           <h1 className="text-2xl md:text-3xl font-semibold">Sora Lite — Niche Rebuild</h1>
-          <p className="text-sm text-neutral-600">
+          <p className={paraText}>
             Niche: UGC Story Telling • Kesehatan • Trik Sulap • Lucu (Hanz × Sweepy)
           </p>
         </header>
@@ -508,16 +503,14 @@ ${extra.trim() || "-"}
               <div className="flex items-center justify-between">
                 <div>
                   <div className={label}>Niche</div>
-                  <div className="text-xs text-neutral-500">
-                    Sweepy hanya boleh muncul di niche Lucu (colab).
-                  </div>
+                  <div className={subText}>Sweepy hanya boleh muncul di niche Lucu (colab).</div>
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {(["ugc_story", "kesehatan", "sulap", "lucu_colab"] as NicheKey[]).map((k) => (
                   <button
                     key={k}
-                    className={`${btn} ${niche === k ? "border-black" : ""}`}
+                    className={`${btn} ${niche === k ? "border-blue-300/70 bg-blue-900/20" : ""}`}
                     onClick={() => setNiche(k)}
                   >
                     {NICHE_LABEL[k]}
@@ -537,7 +530,7 @@ ${extra.trim() || "-"}
                   return (
                     <button
                       key={k}
-                      className={`${btn} ${actuallySelected ? "border-black" : ""} ${
+                      className={`${btn} ${actuallySelected ? "border-blue-300/70 bg-blue-900/20" : ""} ${
                         disabled ? "opacity-40 cursor-not-allowed" : ""
                       }`}
                       onClick={() => !disabled && setPreset(k)}
@@ -557,7 +550,7 @@ ${extra.trim() || "-"}
               </div>
 
               {effectivePreset !== preset && (
-                <div className="mt-2 text-xs text-amber-700">
+                <div className="mt-2 text-xs text-amber-300">
                   Preset disesuaikan otomatis ke: <b>{PRESET_LABEL[effectivePreset]}</b>
                 </div>
               )}
@@ -565,7 +558,7 @@ ${extra.trim() || "-"}
 
             <section className={boxStyle}>
               <div className={label}>Auto Generate</div>
-              <p className="text-xs text-neutral-500 mt-1">
+              <p className={subText}>
                 Selalu generate prompt baru (anti monoton). Jika Prompt Utama kosong, hasil auto akan
                 masuk ke Prompt Utama.
               </p>
@@ -588,10 +581,13 @@ ${extra.trim() || "-"}
 
             <section className={boxStyle}>
               <div className={label}>Caption + 5 Hashtags</div>
-              <div className="mt-2 text-sm">{caption}</div>
+              <div className="mt-2 text-sm text-slate-100">{caption}</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {hashtags.map((t) => (
-                  <span key={t} className="text-xs px-2 py-1 rounded-full border border-neutral-200">
+                  <span
+                    key={t}
+                    className="text-xs px-2 py-1 rounded-full border border-blue-900/40 text-blue-200 bg-blue-900/10"
+                  >
                     {t}
                   </span>
                 ))}
@@ -610,9 +606,7 @@ ${extra.trim() || "-"}
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className={label}>Prompt Utama</div>
-                  <div className="text-xs text-neutral-500">
-                    Isi ini dulu supaya Copy/Save aktif.
-                  </div>
+                  <div className={subText}>Isi ini dulu supaya Copy/Save aktif.</div>
                 </div>
                 <div className="flex gap-2">
                   <button className={btn} onClick={() => setPromptUtama("")}>
@@ -621,7 +615,8 @@ ${extra.trim() || "-"}
                   <button
                     className={btn}
                     onClick={() => {
-                      const demo = `Buat video 10–15 detik, hook kuat di 2 detik pertama, bahasa Indonesia santai, ending punchline.`;
+                      const demo =
+                        "Buat video 10–15 detik, hook kuat di 2 detik pertama, bahasa Indonesia santai, ending punchline.";
                       setPromptUtama((p) => (p.trim() ? p : demo));
                     }}
                   >
@@ -630,7 +625,7 @@ ${extra.trim() || "-"}
                 </div>
               </div>
               <textarea
-                className="mt-3 w-full min-h-[180px] rounded-xl border border-neutral-200 p-3 text-sm outline-none focus:border-black"
+                className={`${textareaBase} min-h-[180px]`}
                 placeholder="Contoh: 'Gue mau cerita…' / 'Hari ini gue coba habit...' / 'Jangan kedip...' / atau klik Auto Generate"
                 value={promptUtama}
                 onChange={(e) => setPromptUtama(e.target.value)}
@@ -640,7 +635,7 @@ ${extra.trim() || "-"}
             <section className={boxStyle}>
               <div className={label}>Extra (optional)</div>
               <textarea
-                className="mt-3 w-full min-h-[120px] rounded-xl border border-neutral-200 p-3 text-sm outline-none focus:border-black"
+                className={`${textareaBase} min-h-[120px]`}
                 placeholder="Tambahan: gaya kamera, lokasi spesifik, outfit, dll..."
                 value={extra}
                 onChange={(e) => setExtra(e.target.value)}
@@ -651,11 +646,7 @@ ${extra.trim() || "-"}
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <div className={label}>Final Prompt</div>
-                  {!canCopySave && (
-                    <div className="text-xs text-amber-700 mt-1">
-                      Isi Prompt Utama dulu supaya Copy/Save aktif.
-                    </div>
-                  )}
+                  {!canCopySave && <div className="text-xs text-amber-300 mt-1">Isi Prompt Utama dulu.</div>}
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -675,7 +666,7 @@ ${extra.trim() || "-"}
                 </div>
               </div>
 
-              <pre className="mt-3 whitespace-pre-wrap rounded-xl border border-neutral-200 p-3 text-sm bg-neutral-50">
+              <pre className="mt-3 whitespace-pre-wrap rounded-xl border border-blue-900/40 p-3 text-sm bg-blue-950/40 text-slate-100">
                 {finalPrompt}
               </pre>
             </section>
@@ -685,20 +676,20 @@ ${extra.trim() || "-"}
               <section className={boxStyle}>
                 <div className="flex items-center justify-between">
                   <div className={label}>Saved Prompts</div>
-                  <div className="text-xs text-neutral-500">{saved.length}</div>
+                  <div className="text-xs text-blue-300/70">{saved.length}</div>
                 </div>
 
                 <div className="mt-3 space-y-2 max-h-[360px] overflow-auto pr-1">
                   {saved.length === 0 ? (
-                    <div className="text-sm text-neutral-500">Belum ada. Klik Save dulu.</div>
+                    <div className="text-sm text-blue-300/70">Belum ada. Klik Save dulu.</div>
                   ) : (
                     saved.map((s) => (
                       <div
                         key={s.id}
-                        className="rounded-xl border border-neutral-200 p-3 bg-white"
+                        className="rounded-xl border border-blue-900/40 p-3 bg-blue-950/30"
                       >
-                        <div className="text-sm font-medium">{s.title}</div>
-                        <div className="text-xs text-neutral-500 mt-1">
+                        <div className="text-sm font-medium text-slate-100">{s.title}</div>
+                        <div className="text-xs text-blue-300/70 mt-1">
                           {NICHE_LABEL[s.niche]} • {PRESET_LABEL[s.preset]}
                         </div>
 
@@ -741,7 +732,7 @@ ${extra.trim() || "-"}
                 <div className="flex items-center justify-between">
                   <div className={label}>History (Auto Generate)</div>
                   <div className="flex items-center gap-2">
-                    <div className="text-xs text-neutral-500">{history.length}</div>
+                    <div className="text-xs text-blue-300/70">{history.length}</div>
                     <button className={btn} onClick={clearHistory}>
                       Clear
                     </button>
@@ -750,19 +741,19 @@ ${extra.trim() || "-"}
 
                 <div className="mt-3 space-y-2 max-h-[360px] overflow-auto pr-1">
                   {history.length === 0 ? (
-                    <div className="text-sm text-neutral-500">
+                    <div className="text-sm text-blue-300/70">
                       Klik Auto Generate buat mulai bikin riwayat.
                     </div>
                   ) : (
                     history.map((h) => (
                       <div
                         key={h.id}
-                        className="rounded-xl border border-neutral-200 p-3 bg-white"
+                        className="rounded-xl border border-blue-900/40 p-3 bg-blue-950/30"
                       >
-                        <div className="text-xs text-neutral-500">
+                        <div className="text-xs text-blue-300/70">
                           {NICHE_LABEL[h.niche]} • {PRESET_LABEL[h.preset]}
                         </div>
-                        <pre className="mt-2 whitespace-pre-wrap text-xs bg-neutral-50 border border-neutral-200 rounded-xl p-2">
+                        <pre className="mt-2 whitespace-pre-wrap text-xs bg-blue-950/40 border border-blue-900/40 rounded-xl p-2 text-slate-100">
                           {h.prompt}
                         </pre>
                         <div className="mt-2 flex flex-wrap gap-2">
@@ -788,9 +779,8 @@ ${extra.trim() || "-"}
           </div>
         </div>
 
-        <footer className="text-xs text-neutral-500 pt-2">
-          Tips: untuk niche <b>Lucu (Hanz × Sweepy)</b>, gunakan Auto Generate berkali-kali — sistem
-          akan inject variasi scenario + ending biar prompt selalu baru.
+        <footer className="text-xs text-blue-300/70 pt-2">
+          Tips: untuk niche <b className="text-blue-200">Lucu (Hanz × Sweepy)</b>, tekan Auto Generate berkali-kali — sistem akan inject variasi scenario + ending biar prompt selalu baru.
         </footer>
       </div>
     </div>
