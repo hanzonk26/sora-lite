@@ -2,868 +2,797 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-type CharacterKey = "general" | "hanz" | "sweepy" | "kolab";
-type NicheKey = "lucu" | "daily" | "kesehatan" | "ugc" | "horror" | "sweepy_only";
+/**
+ * Sora Lite - page.tsx (FULL REPLACE)
+ * - Niche rebuilt:
+ *   1) UGC Story Telling
+ *   2) Kesehatan
+ *   3) Trik Sulap
+ *   4) Lucu (KHUSUS COLAB @hanz26 x Sweepy) -> auto-generate ALWAYS new
+ * - Rules:
+ *   - Sweepy only appears in niche "Lucu (Hanz x Sweepy)"
+ *   - Auto generate injects randomness blocks & avoids repeating last output
+ * - UX:
+ *   - Copy/Save disabled until Prompt Utama filled
+ *   - Caption + 5 hashtags: single clean output (no duplicated raw line)
+ *   - Save Prompts + History stored in localStorage
+ */
 
-type SavedItem = {
+type NicheKey = "ugc_story" | "kesehatan" | "sulap" | "lucu_colab";
+type PresetKey = "general" | "hanz26" | "sweepy" | "colab";
+
+type SavedPrompt = {
   id: string;
-  createdAt: number;
-  character: CharacterKey;
+  title: string;
   niche: NicheKey;
-  promptMain: string;
-  extra: string;
-  finalPrompt: string;
+  preset: PresetKey;
+  prompt: string;
   caption: string;
   hashtags: string[];
+  createdAt: number;
 };
 
 type HistoryItem = {
   id: string;
-  createdAt: number;
-  character: CharacterKey;
   niche: NicheKey;
-  finalPrompt: string;
-  caption: string;
-  hashtags: string[];
+  preset: PresetKey;
+  prompt: string;
+  createdAt: number;
 };
 
-const LS_SAVED = "sora_lite_saved_v7";
-const LS_HISTORY = "sora_lite_history_v7";
-
-const CHARACTER_LABEL: Record<CharacterKey, string> = {
-  general: "General",
-  hanz: "Hanz 👤",
-  sweepy: "Sweepy 🐒",
-  kolab: "Kolab 🤝",
-};
+const LS_SAVED = "soraLite.savedPrompts.v1";
+const LS_HISTORY = "soraLite.history.v1";
 
 const NICHE_LABEL: Record<NicheKey, string> = {
-  lucu: "Lucu",
-  daily: "Daily life",
+  ugc_story: "UGC Story Telling",
   kesehatan: "Kesehatan",
-  ugc: "UGC",
-  horror: "Horror",
-  sweepy_only: "Sweepy-only",
+  sulap: "Trik Sulap",
+  lucu_colab: "Lucu (Hanz × Sweepy)",
 };
 
-// ---------- Prompt building blocks ----------
-const BASE_OUTPUT_RULES = [
-  "9:16 vertical, 10–15 seconds",
-  "realistic lighting, clean composition, clear subject, phone-friendly framing",
-  "safe content, avoid extreme gore, avoid medical claims",
-].join(", ");
-
-const CHARACTER_RULES: Record<CharacterKey, string> = {
-  general:
-    "No specific character. Keep it generic, natural, realistic, not cartoonish unless requested. Clean wardrobe, everyday setting.",
-  hanz:
-    "Character: Hanz (human). Calm, relaxed, modest, stylish, neat everyday outfit. Natural gestures, friendly vibe, not over-acting. Looks like a real person.",
-  sweepy:
-    "Character: Sweepy (real monkey). MUST remain animal-like: animal anatomy, animal movement. NO human hands/face, NOT a person in costume, NOT anthropomorphic. Natural monkey behavior only.",
-  kolab:
-    "Collab: Hanz (human) + Sweepy (real monkey). Keep Sweepy animal-like, natural monkey behavior. Safe and wholesome. Hanz reacts calmly and tries not to laugh. No unsafe stunts.",
+const PRESET_LABEL: Record<PresetKey, string> = {
+  general: "General (tanpa karakter spesifik)",
+  hanz26: "@hanz26",
+  sweepy: "Sweepy",
+  colab: "Colab (Hanz × Sweepy)",
 };
 
-const NICHE_RULES: Record<NicheKey, string> = {
-  lucu: "Tone: comedy, light, punchline ending (safe). Focus on reactions, timing, small funny twist.",
-  daily: "Tone: daily life, relatable, calm, satisfying. Small moment, realistic pacing.",
-  kesehatan:
-    "Tone: healthy lifestyle inspiration (non-medical). No medical claims. Simple habit, hydration, sleep, walking, meal prep. Show routine.",
-  ugc: "Tone: UGC creator vibe. Handheld phone feel (but stable), clear talking points, product-neutral unless user specifies. Natural voiceover implied (no need to add audio).",
-  horror:
-    "Tone: cinematic mild horror, suspense, eerie ambience. NO extreme gore, no jump-scare violence. Safe spooky.",
-  sweepy_only:
-    "Only Sweepy (monkey). Absolutely no human gestures. Emphasize animal-only behavior, curiosity, playful mischief, reactions.",
-};
-
-// Viral-ish idea bank (Indonesia-friendly), each item: title + scene skeleton
-type Idea = { title: string; scene: string; twist: string; shots: string[]; safeNote?: string };
-
-const IDEAS: Record<NicheKey, Idea[]> = {
-  lucu: [
-    {
-      title: "Salah paham instruksi simpel",
-      scene: "At home / halaman rumah, karakter menerima instruksi sederhana (mis: 'ambil yang kecil')",
-      twist: "yang diambil malah benda lucu/tidak terduga, karakter menahan ketawa lalu pecah ketawa",
-      shots: ["wide establishing", "close-up reaction", "cut-in object", "punchline close-up"],
-    },
-    {
-      title: "Properti kecil ‘hilang’",
-      scene: "Hanz siap rekam konten, properti kecil (remote/pen) ada di meja",
-      twist: "tiba-tiba properti ‘geser sendiri’ (ternyata Sweepy nyolong pelan), Hanz freeze lalu senyum",
-      shots: ["over-shoulder to table", "macro on prop", "reveal to Sweepy", "reaction + end card"],
-    },
-    {
-      title: "‘Auto caption’ ngaco (tapi aman)",
-      scene: "Hanz merekam, muncul text overlay salah (implied), Hanz koreksi sambil ketawa kecil",
-      twist: "Sweepy ikut ‘protes’ dengan suara/reaksi monyet natural, Hanz makin sulit nahan ketawa",
-      shots: ["phone-like medium", "close-up mouth reaction", "Sweepy reaction", "final beat"],
-    },
-  ],
-  daily: [
-    {
-      title: "Morning routine 10 detik",
-      scene: "Pagi, cahaya lembut, meja rapi, minum air + rapihin outfit",
-      twist: "Sweepy muncul sebentar numpang lewat, bikin momen wholesome",
-      shots: ["soft wide", "hands detail", "mirror shot", "tiny surprise"],
-    },
-    {
-      title: "Bikin kopi tenang",
-      scene: "Buat kopi di dapur minimalis",
-      twist: "tetes terakhir pas banget (satisfying), karakter senyum kecil",
-      shots: ["close-up pour", "steam detail", "sip reaction", "end frame"],
-    },
-    {
-      title: "Before-after rapiin meja",
-      scene: "Meja berantakan → diberesin cepat",
-      twist: "Sweepy ‘bantu’ tapi malah mindahin satu barang random (lucu halus)",
-      shots: ["before wide", "fast tidy montage", "after reveal", "micro twist"],
-    },
-  ],
-  kesehatan: [
-    {
-      title: "Habit sehat tanpa klaim",
-      scene: "Jalan santai sore + minum air",
-      twist: "Hanz kasih gestur ‘ayo’ yang kalem, vibe adem",
-      shots: ["walking wide", "shoe steps", "water bottle close-up", "smile end"],
-    },
-    {
-      title: "Meal prep simpel",
-      scene: "Siapkan snack sehat (buah/yogurt) di meja",
-      twist: "Sweepy ngintip penasaran, tapi tetap animal-like dan aman",
-      shots: ["ingredient close-up", "hands prep", "peek moment", "final plate"],
-      safeNote: "No medical claims, no weight-loss promises.",
-    },
-    {
-      title: "Stretch 10 detik",
-      scene: "Stretch ringan di ruang tamu",
-      twist: "Sweepy meniru gerak (animal-like, sekadar mirroring posture) lalu pergi",
-      shots: ["full body", "detail stretch", "Sweepy cameo", "calm end"],
-    },
-  ],
-  ugc: [
-    {
-      title: "UGC talking points (netral)",
-      scene: "Hanz ngomong ke kamera: hook 1 kalimat + 2 poin + CTA halus",
-      twist: "Sweepy ganggu dikit (ambil properti kecil) bikin momen natural",
-      shots: ["camera-to-subject", "punch-in for emphasis", "b-roll hands", "end CTA"],
-    },
-    {
-      title: "Before/After ‘vibe’",
-      scene: "Hanz tampil biasa → switch jadi lebih rapi (stylish)",
-      twist: "Sweepy muncul pas transisi, jadi comedic beat",
-      shots: ["before medium", "transition snap", "after reveal", "reaction"],
-    },
-    {
-      title: "POV viewer",
-      scene: "Seolah penonton yang diajak ngobrol, vibe santai",
-      twist: "Hanz tahan ketawa karena Sweepy off-camera",
-      shots: ["POV close", "hand gesture minimal", "quick cut", "end"],
-    },
-  ],
-  horror: [
-    {
-      title: "Bayangan lewat",
-      scene: "Koridor rumah malam, lampu temaram",
-      twist: "ternyata Sweepy lewat di background (aman), Hanz kaget kecil lalu lega",
-      shots: ["slow wide", "shadow moment", "reveal", "relief end"],
-    },
-    {
-      title: "Suara aneh (aman)",
-      scene: "Hanz dengar suara dari dapur",
-      twist: "ternyata botol jatuh pelan / Sweepy bikin bunyi, bukan hantu",
-      shots: ["listen close-up", "walk-in", "reveal object", "laugh end"],
-    },
-    {
-      title: "TV glitch ringan",
-      scene: "TV statis ringan, ambience dingin",
-      twist: "Hanz matiin TV, Sweepy muncul dari samping bikin lucu halus",
-      shots: ["TV close-up", "hand to remote", "reaction", "punchline"],
-    },
-  ],
-  sweepy_only: [
-    {
-      title: "Monyet salah ambil benda",
-      scene: "Halaman rumah, Sweepy lihat dua benda kecil",
-      twist: "ambil yang salah, lalu ekspresi bingung (animal-like) → punchline",
-      shots: ["wide", "object close-up", "face reaction", "end"],
-      safeNote: "No human gestures. Keep monkey animal-like.",
-    },
-    {
-      title: "Curiosity check",
-      scene: "Sweepy mendekati benda baru (mis: botol kosong) dan mengendus",
-      twist: "benda bunyi pelan, Sweepy kaget kecil lalu penasaran lagi",
-      shots: ["low angle", "sniff close", "startle", "curious end"],
-    },
-    {
-      title: "Mini ‘heist’",
-      scene: "Sweepy pelan-pelan ‘nyolong’ benda kecil (aman) lalu kabur",
-      twist: "berhenti sebentar, lihat kamera, lalu lanjut kabur",
-      shots: ["tracking shot", "hand—(animal paw) detail", "look to camera", "exit"],
-    },
-  ],
-};
-
-// ---------- Helpers ----------
-function uid() {
-  return Math.random().toString(16).slice(2) + Date.now().toString(16);
+function uid(prefix = "id") {
+  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 }
 
-function clampText(s: string, max = 180) {
-  const t = (s || "").trim();
-  if (t.length <= max) return t;
-  return t.slice(0, max).trimEnd() + "…";
-}
-
-function cleanCaption(input: string) {
-  let s = (input || "").trim();
-
-  // Remove weird repeated words like "di di", "yang yang", "dan dan"
-  s = s.replace(/\b(di|yang|dan|aku|kamu)\s+\1\b/gi, "$1");
-  s = s.replace(/\s{2,}/g, " ");
-  s = s.replace(/\.{3,}/g, "…");
-
-  // Remove double punctuation
-  s = s.replace(/([!?.,])\1+/g, "$1");
-
-  // Ensure no leading dash/colon weirdness
-  s = s.replace(/^[\-\:\•\–\—\s]+/g, "");
-
-  // Hard clamp
-  s = clampText(s, 160);
-
-  // If still too bland/empty, fallback
-  if (s.length < 6) s = "Momen kecil yang bikin senyum 🙂";
-  return s;
-}
-
-function buildHashtags(niche: NicheKey, character: CharacterKey) {
-  const base = ["#sora", "#aivideo", "#viral"];
-  const mapNiche: Record<NicheKey, string[]> = {
-    lucu: ["#lucu", "#komedi"],
-    daily: ["#dailylife", "#relatable"],
-    kesehatan: ["#healthy", "#lifestyle"],
-    ugc: ["#ugc", "#contentcreator"],
-    horror: ["#horror", "#spooky"],
-    sweepy_only: ["#monkey", "#animal"],
-  };
-
-  const mapChar: Record<CharacterKey, string[]> = {
-    general: [],
-    hanz: ["#hanz"],
-    sweepy: ["#sweepy", "#monyet"],
-    kolab: ["#kolab", "#hanzxsweepy"],
-  };
-
-  const tags = [...base, ...mapNiche[niche], ...mapChar[character]];
-  // pick 5 unique, keep order-ish
-  const uniq: string[] = [];
-  for (const t of tags) {
-    if (!uniq.includes(t)) uniq.push(t);
-    if (uniq.length >= 5) break;
-  }
-  while (uniq.length < 5) uniq.push("#fyp");
-  return uniq.slice(0, 5);
-}
-
-function pickRandom<T>(arr: T[]) {
+function pick<T>(arr: T[]) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function safeJoin(lines: string[]) {
-  return lines.filter(Boolean).join("\n\n").trim();
+function shuffle<T>(arr: T[]) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
-// ---------- UI bits ----------
-function Chip({
-  active,
-  label,
-  onClick,
-  tone = "default",
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-  tone?: "default" | "accent";
-}) {
-  const base =
-    "px-4 py-2 rounded-full text-sm font-semibold transition select-none active:scale-[0.98] shadow-sm";
-  const cls = active
-    ? tone === "accent"
-      ? "bg-emerald-400 text-[#071014]"
-      : "bg-white/20 text-white"
-    : "bg-white/10 text-white/90 hover:bg-white/15";
-  return (
-    <button type="button" onClick={onClick} className={`${base} ${cls}`}>
-      {label}
-    </button>
-  );
+function clampText(s: string) {
+  return s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-function Card({ title, children, right }: { title: string; children: React.ReactNode; right?: React.ReactNode }) {
-  return (
-    <section className="rounded-3xl bg-white/8 border border-white/10 shadow-lg backdrop-blur-xl p-5 md:p-6">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-extrabold tracking-tight">{title}</h2>
-        {right}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-async function copyText(text: string) {
+function safeParse<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
   try {
-    await navigator.clipboard.writeText(text);
-    return true;
+    return JSON.parse(raw) as T;
   } catch {
-    return false;
+    return fallback;
   }
 }
 
-export default function Page() {
-  const [character, setCharacter] = useState<CharacterKey>("general");
-  const [niche, setNiche] = useState<NicheKey>("daily");
+/** ---------- Random Pools (anti-monoton) ---------- */
 
-  const [promptMain, setPromptMain] = useState("");
-  const [extra, setExtra] = useState("");
+const UGC_LOCATIONS = [
+  "di kamar sederhana dengan cahaya natural pagi",
+  "di teras rumah sore hari",
+  "di coffee shop kecil yang tenang",
+  "di pinggir jalan dengan vibe kota (handheld)",
+  "di dalam mobil parkir (vlog feel)",
+  "di dapur rumah, suasana santai",
+];
 
-  const [finalPrompt, setFinalPrompt] = useState("");
-  const [caption, setCaption] = useState("");
-  const [hashtags, setHashtags] = useState<string[]>([]);
+const UGC_EMOTIONS = ["tenang", "excited", "reflektif", "kocak tipis", "serius tapi santai"];
 
-  const [saved, setSaved] = useState<SavedItem[]>([]);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+const UGC_CAMERA = [
+  "eye-level, handheld ringan, sedikit goyang natural",
+  "tripod statis, framing dada ke atas",
+  "sedikit close-up, fokus ekspresi wajah",
+  "angle sedikit samping, terasa candid",
+];
 
-  const [toast, setToast] = useState<string>("");
-  const toastTimer = useRef<number | null>(null);
+const UGC_STORY_THEMES = [
+  "momen kecil yang bikin kamu sadar sesuatu",
+  "cerita gagal lucu yang berakhir jadi pelajaran",
+  "kejadian random hari ini yang ternyata relate banget",
+  "pengalaman singkat yang bikin mood berubah",
+  "cerita 'gue kira begini, ternyata begitu'",
+];
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(""), 1400);
+const HEALTH_TOPICS = [
+  "cara simpel minum air lebih konsisten",
+  "tips tidur lebih rapi tanpa ribet",
+  "jalan kaki 10 menit setelah makan",
+  "ngurangin gula pelan-pelan tanpa stres",
+  "cara napas 60 detik buat nurunin tegang",
+  "strategi 'piring sehat' versi gampang",
+];
+
+const HEALTH_CONTEXT = [
+  "tanpa klaim medis, cuma kebiasaan yang membantu",
+  "bahas dengan bahasa ringan, kayak ngobrol sama teman",
+  "ingatkan: kalau ada kondisi khusus, konsultasi profesional",
+];
+
+const MAGIC_PROPS = ["koin", "kartu", "tisu", "karet gelang", "pulpen", "HP", "gelas plastik"];
+
+const MAGIC_TWISTS = [
+  "objek tiba-tiba pindah posisi padahal kamera terus merekam",
+  "koin lenyap lalu muncul di tempat yang mustahil",
+  "kartu berubah jadi kartu lain dalam 1 detik",
+  "tisu sobek tiba-tiba utuh lagi",
+  "karet gelang tembus jari dengan close-up",
+];
+
+const COLAB_SITUATIONS = [
+  "lagi masak mie instan tapi Sweepy sok jadi chef",
+  "lagi nyapu rumah tapi Sweepy malah ngasih 'teknik' aneh",
+  "lagi bikin konten, Sweepy nyelonong minta cameo",
+  "lagi kerja di laptop, Sweepy jadi 'manager' nyuruh-nyuruh",
+  "lagi siap-siap olahraga, Sweepy ngerjain pemanasan absurd",
+  "lagi ngopi, Sweepy ngaku-ngaku barista dan bikin drama",
+];
+
+const SWEEPY_ROLE = ["ngeyel", "sok pintar", "jail", "terlalu percaya diri", "super random", "jahil tapi gemes"];
+
+const COLAB_ENDINGS = [
+  "ending: @hanz26 kalah debat dan ketawa pasrah",
+  "ending: Sweepy berhasil 'menang' tapi bikin berantakan",
+  "ending: tiba-tiba keduanya freeze dan saling tatap, cut lucu",
+  "ending: @hanz26 ngomel halus, Sweepy senyum puas",
+  "ending: reveal kalau Sweepy diam-diam ngerekam semuanya",
+];
+
+/** ---------- Caption + Hashtag Generator ---------- */
+
+function generateCaptionAndHashtags(niche: NicheKey) {
+  const captionPool: Record<NicheKey, string[]> = {
+    ugc_story: [
+      "Kadang ceritanya simpel, tapi maknanya nyangkut. 😅",
+      "Gue baru sadar ini… dan kok relate banget ya?",
+      "Kejadian kecil, tapi efeknya lumayan bikin mikir.",
+      "Ini tipe cerita yang bikin: “lah kok gue juga?”",
+    ],
+    kesehatan: [
+      "Kebiasaan kecil, kalau konsisten, efeknya kerasa. 💧",
+      "Gak harus perfect — yang penting jalan dulu.",
+      "Reminder halus buat diri sendiri (dan kamu).",
+      "Sehat itu maraton, bukan sprint.",
+    ],
+    sulap: [
+      "Oke… ini kok bisa?! 😳",
+      "Jangan kedip. Serius.",
+      "Kalau kamu bisa nebak, kamu jago.",
+      "Ini trik kecil tapi bikin kepala nge-lag.",
+    ],
+    lucu_colab: [
+      "Duo chaos lagi beraksi… 🐵🤣",
+      "Hari ini Sweepy kebanyakan ide.",
+      "Yang satu serius, yang satu… ya gitu deh.",
+      "Cuma mau bikin konten… malah jadi rame.",
+    ],
   };
 
-  // Load LS
+  const hashtagPool: Record<NicheKey, string[]> = {
+    ugc_story: ["ugc", "storytime", "relate", "kontenharian", "fyp"],
+    kesehatan: ["kesehatan", "sehat", "healthyhabit", "selfimprovement", "fyp"],
+    sulap: ["sulap", "magic", "illusion", "trik", "fyp"],
+    lucu_colab: ["lucu", "komedi", "sweepy", "hanz26", "fyp"],
+  };
+
+  const caption = pick(captionPool[niche]);
+  const tags = shuffle(hashtagPool[niche]).slice(0, 5).map((t) => `#${t}`);
+  return { caption, hashtags: tags };
+}
+
+/** ---------- Prompt Builders ---------- */
+
+function baseVideoSpec() {
+  // A small always-changing token to reduce repeats; harmless to Sora prompt.
+  const r = Math.random().toString(36).slice(2, 8);
+  return [
+    "Format: vertical 9:16, UGC social media feel",
+    "Audio: natural room tone (no music mandated)",
+    `Uniqueness token: ${r}`,
+  ];
+}
+
+function buildUGCStoryPrompt(preset: PresetKey) {
+  const loc = pick(UGC_LOCATIONS);
+  const emo = pick(UGC_EMOTIONS);
+  const cam = pick(UGC_CAMERA);
+  const theme = pick(UGC_STORY_THEMES);
+
+  const characterLine =
+    preset === "hanz26"
+      ? "Character: @hanz26 (same consistent look), speaks directly to camera."
+      : "Character: a friendly Indonesian male creator, speaks directly to camera.";
+
+  return clampText(`
+UGC-style storytelling video.
+${characterLine}
+Tone: ${emo}, conversational, first-person.
+Setting: ${loc}.
+Camera: ${cam}.
+Story theme: ${theme}.
+Delivery: natural pauses, authentic expressions, subtle hand gestures.
+No cinematic exaggeration. Feels like real TikTok/IG Reels.
+
+${baseVideoSpec().join("\n")}
+`);
+}
+
+function buildHealthPrompt(preset: PresetKey) {
+  const loc = pick(UGC_LOCATIONS);
+  const cam = pick(UGC_CAMERA);
+  const topic = pick(HEALTH_TOPICS);
+  const ctx = pick(HEALTH_CONTEXT);
+
+  const characterLine =
+    preset === "hanz26"
+      ? "Character: @hanz26 (same consistent look), casual healthy vibe."
+      : "Character: Indonesian creator, clean and calm look, casual outfit.";
+
+  return clampText(`
+UGC health content (light, friendly, non-medical).
+${characterLine}
+Topic: ${topic}.
+Rule: ${ctx}.
+Setting: ${loc}.
+Camera: ${cam}.
+Style: practical, easy-to-follow, like advice from a friend.
+Avoid claims like “menyembuhkan” or “pasti sembuh”.
+
+${baseVideoSpec().join("\n")}
+`);
+}
+
+function buildMagicPrompt(preset: PresetKey) {
+  const prop = pick(MAGIC_PROPS);
+  const twist = pick(MAGIC_TWISTS);
+  const cam = pick([
+    "close-up on hands, quick refocus to face reaction",
+    "over-shoulder angle, then snap zoom to reveal",
+    "tight framing, stable shot, very clear object visibility",
+  ]);
+
+  const characterLine =
+    preset === "hanz26"
+      ? "Character: @hanz26 (same consistent look), playful magician vibe."
+      : "Character: Indonesian creator, playful magician vibe.";
+
+  return clampText(`
+Short-form magic trick video (do NOT explain the method).
+${characterLine}
+Prop: ${prop}.
+Core illusion: ${twist}.
+Camera: ${cam}.
+Pacing: fast, engaging, one clean reveal at the end.
+Ending: character reacts (smirk / surprised / laughs) to sell the illusion.
+
+${baseVideoSpec().join("\n")}
+`);
+}
+
+function buildColabFunnyPrompt() {
+  const situation = pick(COLAB_SITUATIONS);
+  const role = pick(SWEEPY_ROLE);
+  const ending = pick(COLAB_ENDINGS);
+  const loc = pick([
+    "ruang keluarga sederhana",
+    "dapur rumah",
+    "teras rumah",
+    "coffee shop",
+    "meja kerja dengan laptop",
+  ]);
+
+  const camera = pick([
+    "handheld vlog feel, natural shakiness",
+    "static tripod, then quick handheld cut-ins",
+    "over-the-shoulder shot alternating to reaction shots",
+  ]);
+
+  // Hard rule: always both characters + interaction
+  return clampText(`
+Funny UGC-style collaboration video.
+Characters: @hanz26 (human) and Sweepy (cute monkey) on screen together, interacting naturally.
+Scenario: ${situation}.
+Sweepy personality: ${role} (slightly chaotic but adorable).
+Setting: ${loc}.
+Camera: ${camera}.
+Dialog style: quick back-and-forth, natural Indonesian casual vibe (no narrator).
+Humor: absurd-but-believable everyday chaos.
+${ending}.
+
+${baseVideoSpec().join("\n")}
+`);
+}
+
+function enforcePresetForNiche(niche: NicheKey, preset: PresetKey): PresetKey {
+  // Sweepy ONLY allowed in lucu_colab via colab preset
+  if (niche === "lucu_colab") return "colab";
+  if (preset === "sweepy" || preset === "colab") return "hanz26"; // keep you as default
+  return preset;
+}
+
+function generatePrompt(niche: NicheKey, preset: PresetKey) {
+  const enforced = enforcePresetForNiche(niche, preset);
+  switch (niche) {
+    case "ugc_story":
+      return buildUGCStoryPrompt(enforced);
+    case "kesehatan":
+      return buildHealthPrompt(enforced);
+    case "sulap":
+      return buildMagicPrompt(enforced);
+    case "lucu_colab":
+      return buildColabFunnyPrompt();
+  }
+}
+
+/** ---------- UI Component ---------- */
+
+export default function Page() {
+  const [niche, setNiche] = useState<NicheKey>("ugc_story");
+  const [preset, setPreset] = useState<PresetKey>("hanz26");
+
+  const [promptUtama, setPromptUtama] = useState<string>("");
+  const [extra, setExtra] = useState<string>("");
+
+  const [finalPrompt, setFinalPrompt] = useState<string>("");
+  const [caption, setCaption] = useState<string>("");
+  const [hashtags, setHashtags] = useState<string[]>([]);
+
+  const [saved, setSaved] = useState<SavedPrompt[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  const lastAutoRef = useRef<string>("");
+
+  const effectivePreset = useMemo(() => enforcePresetForNiche(niche, preset), [niche, preset]);
+  const canCopySave = promptUtama.trim().length > 0;
+
   useEffect(() => {
-    try {
-      const s = localStorage.getItem(LS_SAVED);
-      const h = localStorage.getItem(LS_HISTORY);
-      if (s) setSaved(JSON.parse(s));
-      if (h) setHistory(JSON.parse(h));
-    } catch {
-      // ignore
-    }
+    // load LS
+    const s = safeParse<SavedPrompt[]>(localStorage.getItem(LS_SAVED), []);
+    const h = safeParse<HistoryItem[]>(localStorage.getItem(LS_HISTORY), []);
+    setSaved(s);
+    setHistory(h);
   }, []);
 
-  // Persist LS
   useEffect(() => {
-    try {
-      localStorage.setItem(LS_SAVED, JSON.stringify(saved.slice(0, 80)));
-    } catch {}
-  }, [saved]);
+    // if niche changes, enforce preset immediately
+    if (effectivePreset !== preset) setPreset(effectivePreset);
+    // also refresh caption/hashtags to match niche
+    const ch = generateCaptionAndHashtags(niche);
+    setCaption(ch.caption);
+    setHashtags(ch.hashtags);
+  }, [niche]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    try {
-      localStorage.setItem(LS_HISTORY, JSON.stringify(history.slice(0, 80)));
-    } catch {}
-  }, [history]);
+    // whenever prompt utama / extra changes -> rebuild final prompt
+    const scene = promptUtama.trim() ? promptUtama.trim() : "[EMPTY] (Write Prompt Utama first)";
+    const autoBlock = generatePrompt(niche, preset);
+    const merged = clampText(`
+SCENE:
+${scene}
 
-  const promptHint = useMemo(() => {
-    if (character === "sweepy") return "Contoh: Sweepy penasaran sama botol kosong, mengendus, lalu kaget kecil (animal-only).";
-    if (character === "kolab") return "Contoh: @hanz26 rekam konten tenang, Sweepy nyolong properti kecil, Hanz nahan ketawa.";
-    if (character === "hanz") return "Contoh: @hanz26 UGC santai, hook singkat, 2 poin, CTA halus. Outfit rapi.";
-    return "Contoh: adegan singkat, realistis, punchline aman, fokus visual dan timing.";
-  }, [character]);
+AUTO STYLE BLOCK:
+${autoBlock}
 
-  function clearAll() {
-    setPromptMain("");
-    setExtra("");
-    setFinalPrompt("");
-    setCaption("");
-    setHashtags([]);
-    showToast("Clear ✓");
+EXTRA (optional):
+${extra.trim() || "-"}
+`);
+    setFinalPrompt(merged);
+  }, [promptUtama, extra, niche, preset]);
+
+  function persistSaved(next: SavedPrompt[]) {
+    setSaved(next);
+    localStorage.setItem(LS_SAVED, JSON.stringify(next));
   }
 
-  function buildPromptFromInputs(opts?: { idea?: Idea }) {
-    const chosenIdea = opts?.idea;
-
-    const sceneMain = promptMain.trim()
-      ? promptMain.trim()
-      : chosenIdea
-      ? `${chosenIdea.scene}. ${chosenIdea.twist}.`
-      : "Scene: a short realistic moment with clear subject and a safe ending.";
-
-    const ideaShots = chosenIdea?.shots?.length
-      ? `SHOT LIST: ${chosenIdea.shots.join(", ")}.`
-      : "SHOT LIST: wide establishing, close-up reaction, cut-in detail, punchline ending.";
-
-    // Sweepy-only guard is stricter
-    const anatomyGuard =
-      character === "sweepy" || niche === "sweepy_only"
-        ? "ANATOMY GUARD: Sweepy must remain a real monkey: animal anatomy, animal movement. NO human hands/face, NOT a person in a costume, NOT anthropomorphic."
-        : character === "kolab"
-        ? "ANATOMY GUARD: Sweepy stays animal-like; no human gestures; safe interaction distance; no dangerous stunts."
-        : "";
-
-    const extraLine = extra.trim()
-      ? extra.trim()
-      : "reaction close-up, detail texture shot, smooth pacing, clean framing";
-
-    const rules = [
-      `CHARACTER RULES: ${CHARACTER_RULES[character]}`,
-      `NICHE: ${NICHE_RULES[niche]}`,
-      `OUTPUT RULES: ${BASE_OUTPUT_RULES}`,
-      anatomyGuard ? anatomyGuard : "",
-    ].filter(Boolean);
-
-    const prompt = safeJoin([
-      `TITLE: ${chosenIdea?.title ?? "Short Viral Scene"}`,
-      `SCENE:\n${sceneMain}`,
-      `EXTRA:\n${extraLine}`,
-      ideaShots,
-      rules.join("\n"),
-    ]);
-
-    // Caption
-    const baseCap = (() => {
-      // Make a cleaner, short Indonesian caption (avoid weird)
-      const vibe =
-        niche === "horror"
-          ? "Sedikit merinding, tapi aman 😅"
-          : niche === "kesehatan"
-          ? "Kebiasaan kecil biar hidup lebih enak 🙂"
-          : niche === "ugc"
-          ? "UGC santai yang gampang ditiru 😌"
-          : niche === "daily"
-          ? "Daily life yang relatable ✨"
-          : niche === "sweepy_only"
-          ? "Monyet kecil yang pintar (animal-only) 🐒"
-          : "Biar ketawa dikit 😄";
-
-      const who =
-        character === "kolab"
-          ? "(@hanz26 × Sweepy)"
-          : character === "hanz"
-          ? "(@hanz26)"
-          : character === "sweepy"
-          ? "(Sweepy)"
-          : "";
-
-      // Use idea title as punchy line
-      const line2 = chosenIdea?.title ? chosenIdea.title : "Momen singkat, twist kecil, ending aman.";
-      const line3 =
-        character === "kolab"
-          ? "Kolab santai: manusia + monyet (aman & natural)."
-          : character === "sweepy" || niche === "sweepy_only"
-          ? "Animal-only: gerak & ekspresi monyet tetap natural."
-          : "Natural, clean, enak ditonton.";
-
-      return `${vibe} ${who}\n${line2}\n${line3}`;
-    })();
-
-    const tagList = buildHashtags(niche, character);
-
-    return { prompt, caption: cleanCaption(baseCap), hashtags: tagList };
+  function persistHistory(next: HistoryItem[]) {
+    setHistory(next);
+    localStorage.setItem(LS_HISTORY, JSON.stringify(next));
   }
 
-  function autoGenerate() {
-    // Pick an idea based on niche, but add variety by sometimes mixing close niches safely
-    const pool = IDEAS[niche] && IDEAS[niche].length ? IDEAS[niche] : IDEAS.daily;
+  function doAutoGenerate() {
+    // Always new:
+    // - generate until differs from lastAutoRef OR max attempts
+    let out = "";
+    for (let i = 0; i < 6; i++) {
+      out = generatePrompt(niche, preset);
+      if (clampText(out) !== clampText(lastAutoRef.current)) break;
+    }
+    lastAutoRef.current = out;
 
-    let idea = pickRandom(pool);
-
-    // If character is sweepy but niche isn't sweepy_only, still keep monkey guard
-    if ((character === "sweepy" || niche === "sweepy_only") && niche !== "sweepy_only") {
-      // still ok
+    // Put the generated block into Prompt Utama by default (so user can directly copy/save)
+    // Or if user already typed, we append a short "direction" line.
+    if (!promptUtama.trim()) {
+      setPromptUtama(out);
+    } else {
+      setExtra((prev) => clampText(`${prev}\n\n# Auto Variation\n${out}`));
     }
 
-    // If character is sweepy-only niche but character isn't sweepy, force character to sweepy for clarity
-    if (niche === "sweepy_only" && character !== "sweepy") setCharacter("sweepy");
-
-    const built = buildPromptFromInputs({ idea });
-    setFinalPrompt(built.prompt);
-    setCaption(built.caption);
-    setHashtags(built.hashtags);
-
-    const hist: HistoryItem = {
-      id: uid(),
-      createdAt: Date.now(),
-      character,
+    // add history (store the out)
+    const item: HistoryItem = {
+      id: uid("hist"),
       niche,
-      finalPrompt: built.prompt,
-      caption: built.caption,
-      hashtags: built.hashtags,
+      preset: enforcePresetForNiche(niche, preset),
+      prompt: out,
+      createdAt: Date.now(),
     };
-    setHistory((prev) => [hist, ...prev].slice(0, 80));
-
-    showToast("Auto generated ✓");
+    persistHistory([item, ...history].slice(0, 80));
   }
 
-  function buildManual() {
-    const built = buildPromptFromInputs();
-    setFinalPrompt(built.prompt);
-    setCaption(built.caption);
-    setHashtags(built.hashtags);
-
-    const hist: HistoryItem = {
-      id: uid(),
-      createdAt: Date.now(),
-      character,
-      niche,
-      finalPrompt: built.prompt,
-      caption: built.caption,
-      hashtags: built.hashtags,
-    };
-    setHistory((prev) => [hist, ...prev].slice(0, 80));
-    showToast("Generated ✓");
-  }
-
-  function saveCurrent() {
-    if (!finalPrompt.trim()) {
-      showToast("Belum ada prompt (Generate dulu)");
-      return;
+  async function copyText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
     }
-    const item: SavedItem = {
-      id: uid(),
-      createdAt: Date.now(),
-      character,
+  }
+
+  function doSave() {
+    if (!canCopySave) return;
+
+    const titleBase = `${NICHE_LABEL[niche]} • ${PRESET_LABEL[enforcePresetForNiche(niche, preset)]}`;
+    const ch = generateCaptionAndHashtags(niche);
+
+    const item: SavedPrompt = {
+      id: uid("save"),
+      title: `${titleBase} • ${new Date().toLocaleString("id-ID")}`,
       niche,
-      promptMain,
-      extra,
-      finalPrompt,
-      caption,
-      hashtags,
+      preset: enforcePresetForNiche(niche, preset),
+      prompt: finalPrompt,
+      caption: ch.caption,
+      hashtags: ch.hashtags,
+      createdAt: Date.now(),
     };
-    setSaved((prev) => [item, ...prev].slice(0, 80));
-    showToast("Saved ✓");
+
+    persistSaved([item, ...saved].slice(0, 200));
+    setCaption(ch.caption);
+    setHashtags(ch.hashtags);
   }
 
-  function loadSaved(item: SavedItem) {
-    setCharacter(item.character);
-    setNiche(item.niche);
-    setPromptMain(item.promptMain);
-    setExtra(item.extra);
-    setFinalPrompt(item.finalPrompt);
-    setCaption(item.caption);
-    setHashtags(item.hashtags);
-    showToast("Loaded ✓");
-  }
-
-  function deleteSaved(id: string) {
-    setSaved((prev) => prev.filter((x) => x.id !== id));
-    showToast("Deleted ✓");
+  function removeSaved(id: string) {
+    persistSaved(saved.filter((x) => x.id !== id));
   }
 
   function clearHistory() {
-    setHistory([]);
-    showToast("History cleared ✓");
+    persistHistory([]);
   }
 
-  const prettyHashtagsLine = useMemo(() => hashtags.join(" "), [hashtags]);
+  const boxStyle =
+    "border border-neutral-200 rounded-2xl p-4 shadow-sm bg-white/80 backdrop-blur";
+  const btn =
+    "px-3 py-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:scale-[0.99] transition";
+  const btnPrimary =
+    "px-3 py-2 rounded-xl bg-black text-white hover:bg-neutral-800 active:scale-[0.99] transition";
+  const label = "text-sm font-medium text-neutral-700";
 
   return (
-    <main className="min-h-screen bg-[#0b0f16] text-white">
-      {/* soft glow background */}
-      <div className="pointer-events-none fixed inset-0 opacity-70">
-        <div className="absolute -top-28 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-emerald-400/25 blur-3xl" />
-        <div className="absolute top-44 -left-24 h-72 w-72 rounded-full bg-sky-400/15 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-purple-400/12 blur-3xl" />
-      </div>
-
-      <div className="relative mx-auto max-w-[720px] px-4 pb-28 pt-7">
-        <header className="mb-6">
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
-            Sora Lite — Prompt Builder
-          </h1>
-          <p className="mt-2 text-white/75 leading-relaxed">
-            Preset Character + Niche + Prompt manual + Auto Generate + Caption + 5 Hashtags + History + Save.
+    <div className="min-h-screen bg-neutral-50 text-neutral-900">
+      <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-4">
+        <header className="flex flex-col gap-1">
+          <h1 className="text-2xl md:text-3xl font-semibold">Sora Lite — Niche Rebuild</h1>
+          <p className="text-sm text-neutral-600">
+            Niche: UGC Story Telling • Kesehatan • Trik Sulap • Lucu (Hanz × Sweepy)
           </p>
         </header>
 
-        {/* Character (TOP) */}
-        <Card title="Preset Character (atas)">
-          <p className="text-white/70 text-sm mb-4">
-            Pilih karakter dulu. <span className="text-emerald-300 font-semibold">Sweepy selalu animal-only.</span>
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {(["general", "hanz", "sweepy", "kolab"] as CharacterKey[]).map((k) => (
-              <Chip
-                key={k}
-                active={character === k}
-                label={CHARACTER_LABEL[k]}
-                tone="accent"
-                onClick={() => setCharacter(k)}
-              />
-            ))}
-          </div>
+        <div className="grid md:grid-cols-3 gap-4">
+          {/* LEFT */}
+          <div className="md:col-span-1 space-y-4">
+            <section className={boxStyle}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className={label}>Niche</div>
+                  <div className="text-xs text-neutral-500">
+                    Sweepy hanya boleh muncul di niche Lucu (colab).
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {(["ugc_story", "kesehatan", "sulap", "lucu_colab"] as NicheKey[]).map((k) => (
+                  <button
+                    key={k}
+                    className={`${btn} ${niche === k ? "border-black" : ""}`}
+                    onClick={() => setNiche(k)}
+                  >
+                    {NICHE_LABEL[k]}
+                  </button>
+                ))}
+              </div>
+            </section>
 
-          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">
-            <div className="font-bold mb-1">Character rules</div>
-            <div className="leading-relaxed">{CHARACTER_RULES[character]}</div>
-          </div>
-        </Card>
+            <section className={boxStyle}>
+              <div className={label}>Preset Karakter</div>
+              <div className="mt-3 grid grid-cols-1 gap-2">
+                {(["general", "hanz26", "sweepy", "colab"] as PresetKey[]).map((k) => {
+                  const disabled = niche !== "lucu_colab" && (k === "sweepy" || k === "colab");
+                  const enforced = enforcePresetForNiche(niche, k);
+                  const actuallySelected = effectivePreset === enforced && preset === k;
 
-        <div className="h-4" />
-
-        {/* Niche (BELOW) + Auto Generate on right */}
-        <Card
-          title="Niche"
-          right={
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={autoGenerate}
-                className="px-4 py-2 rounded-full bg-emerald-400 text-[#071014] font-extrabold shadow-sm active:scale-[0.98]"
-              >
-                Auto Generate
-              </button>
-              <button
-                type="button"
-                onClick={clearAll}
-                className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 text-white font-bold active:scale-[0.98]"
-              >
-                Clear
-              </button>
-            </div>
-          }
-        >
-          <p className="text-white/70 text-sm mb-4">
-            Pilih niche konten. (Tidak mengunci karakter.)
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(NICHE_LABEL) as NicheKey[]).map((k) => (
-              <Chip
-                key={k}
-                active={niche === k}
-                label={NICHE_LABEL[k]}
-                onClick={() => setNiche(k)}
-              />
-            ))}
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">
-            <div className="font-bold mb-1">Niche rules</div>
-            <div className="leading-relaxed">{NICHE_RULES[niche]}</div>
-          </div>
-        </Card>
-
-        <div className="h-4" />
-
-        {/* Manual Prompt */}
-        <Card
-          title="Prompt Manual"
-          right={
-            <button
-              type="button"
-              onClick={buildManual}
-              className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 text-white font-bold active:scale-[0.98]"
-            >
-              Generate (manual)
-            </button>
-          }
-        >
-          <label className="block text-sm font-bold text-white/80 mb-2">Prompt utama</label>
-          <textarea
-            value={promptMain}
-            onChange={(e) => setPromptMain(e.target.value)}
-            placeholder={promptHint}
-            className="w-full min-h-[110px] rounded-2xl bg-[#0a0f16] border border-white/10 p-4 text-white/90 placeholder:text-white/40 outline-none focus:border-emerald-400/50"
-          />
-
-          <label className="block text-sm font-bold text-white/80 mt-4 mb-2">Extra (opsional)</label>
-          <textarea
-            value={extra}
-            onChange={(e) => setExtra(e.target.value)}
-            placeholder="Contoh: handheld but stable, slow push-in, soft shadows, cinematic color, close-up reactions"
-            className="w-full min-h-[90px] rounded-2xl bg-[#0a0f16] border border-white/10 p-4 text-white/90 placeholder:text-white/40 outline-none focus:border-emerald-400/50"
-          />
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={saveCurrent}
-              className="px-4 py-2 rounded-full bg-emerald-400 text-[#071014] font-extrabold active:scale-[0.98]"
-            >
-              Save Prompt
-            </button>
-          </div>
-        </Card>
-
-        <div className="h-4" />
-
-        {/* Output Prompt */}
-        <Card
-          title="Output Prompt"
-          right={
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!finalPrompt.trim()) return showToast("Belum ada output");
-                  const ok = await copyText(finalPrompt);
-                  showToast(ok ? "Prompt copied ✓" : "Gagal copy");
-                }}
-                className="px-4 py-2 rounded-full bg-emerald-400 text-[#071014] font-extrabold active:scale-[0.98]"
-              >
-                Copy Prompt
-              </button>
-            </div>
-          }
-        >
-          <pre className="whitespace-pre-wrap rounded-2xl bg-[#071014] border border-white/10 p-4 text-sm text-white/85 leading-relaxed">
-            {finalPrompt || "Klik Auto Generate atau Generate (manual) untuk membuat prompt."}
-          </pre>
-        </Card>
-
-        <div className="h-4" />
-
-        {/* Caption + Hashtags */}
-        <Card
-          title="Caption + 5 Hashtags"
-          right={
-            <button
-              type="button"
-              onClick={async () => {
-                const pack = [caption, "", prettyHashtagsLine].filter(Boolean).join("\n");
-                if (!pack.trim()) return showToast("Belum ada caption");
-                const ok = await copyText(pack);
-                showToast(ok ? "Caption copied ✓" : "Gagal copy");
-              }}
-              className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 text-white font-bold active:scale-[0.98]"
-            >
-              Copy Caption + Hashtag
-            </button>
-          }
-        >
-          <div className="rounded-2xl bg-[#071014] border border-white/10 p-4">
-            <div className="text-white/90 font-semibold whitespace-pre-wrap">
-              {caption || "Caption akan muncul setelah generate."}
-            </div>
-            <div className="mt-3 text-white/70">{prettyHashtagsLine}</div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {hashtags.map((h) => (
-                <span
-                  key={h}
-                  className="px-3 py-1 rounded-full bg-white/10 border border-white/10 text-xs font-bold text-white/80"
-                >
-                  {h}
-                </span>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        <div className="h-4" />
-
-        {/* History */}
-        <Card
-          title="History (auto & manual)"
-          right={
-            <button
-              type="button"
-              onClick={clearHistory}
-              className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 text-white font-bold active:scale-[0.98]"
-            >
-              Clear history
-            </button>
-          }
-        >
-          {history.length === 0 ? (
-            <p className="text-white/60 text-sm">Belum ada history.</p>
-          ) : (
-            <div className="space-y-3">
-              {history.slice(0, 6).map((h) => (
-                <div key={h.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-extrabold">
-                      {CHARACTER_LABEL[h.character]} • {NICHE_LABEL[h.niche]}
-                    </div>
+                  return (
                     <button
-                      type="button"
-                      className="text-xs font-bold px-3 py-1 rounded-full bg-white/10 hover:bg-white/15"
-                      onClick={async () => {
-                        const ok = await copyText(h.finalPrompt);
-                        showToast(ok ? "Prompt copied ✓" : "Gagal copy");
-                      }}
+                      key={k}
+                      className={`${btn} ${actuallySelected ? "border-black" : ""} ${
+                        disabled ? "opacity-40 cursor-not-allowed" : ""
+                      }`}
+                      onClick={() => !disabled && setPreset(k)}
+                      title={
+                        disabled
+                          ? "Sweepy/Colab hanya untuk niche Lucu (Hanz × Sweepy)"
+                          : PRESET_LABEL[k]
+                      }
                     >
-                      Copy
+                      <div className="flex items-center justify-between">
+                        <span>{PRESET_LABEL[k]}</span>
+                        {disabled ? <span className="text-xs">🔒</span> : null}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {effectivePreset !== preset && (
+                <div className="mt-2 text-xs text-amber-700">
+                  Preset disesuaikan otomatis ke: <b>{PRESET_LABEL[effectivePreset]}</b>
+                </div>
+              )}
+            </section>
+
+            <section className={boxStyle}>
+              <div className={label}>Auto Generate</div>
+              <p className="text-xs text-neutral-500 mt-1">
+                Selalu generate prompt baru (anti monoton). Jika Prompt Utama kosong, hasil auto akan
+                masuk ke Prompt Utama.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button className={btnPrimary} onClick={doAutoGenerate}>
+                  Auto Generate (Fresh)
+                </button>
+                <button
+                  className={btn}
+                  onClick={() => {
+                    const ch = generateCaptionAndHashtags(niche);
+                    setCaption(ch.caption);
+                    setHashtags(ch.hashtags);
+                  }}
+                >
+                  Refresh Caption/Tags
+                </button>
+              </div>
+            </section>
+
+            <section className={boxStyle}>
+              <div className={label}>Caption + 5 Hashtags</div>
+              <div className="mt-2 text-sm">{caption}</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {hashtags.map((t) => (
+                  <span key={t} className="text-xs px-2 py-1 rounded-full border border-neutral-200">
+                    {t}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button className={btn} onClick={() => copyText(`${caption}\n\n${hashtags.join(" ")}`)}>
+                  Copy Caption + Tags
+                </button>
+              </div>
+            </section>
+          </div>
+
+          {/* CENTER */}
+          <div className="md:col-span-2 space-y-4">
+            <section className={boxStyle}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className={label}>Prompt Utama</div>
+                  <div className="text-xs text-neutral-500">
+                    Isi ini dulu supaya Copy/Save aktif.
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button className={btn} onClick={() => setPromptUtama("")}>
+                    Clear
+                  </button>
+                  <button
+                    className={btn}
+                    onClick={() => {
+                      const demo = `Buat video 10–15 detik, hook kuat di 2 detik pertama, bahasa Indonesia santai, ending punchline.`;
+                      setPromptUtama((p) => (p.trim() ? p : demo));
+                    }}
+                  >
+                    Quick Fill
+                  </button>
+                </div>
+              </div>
+              <textarea
+                className="mt-3 w-full min-h-[180px] rounded-xl border border-neutral-200 p-3 text-sm outline-none focus:border-black"
+                placeholder="Contoh: 'Gue mau cerita…' / 'Hari ini gue coba habit...' / 'Jangan kedip...' / atau klik Auto Generate"
+                value={promptUtama}
+                onChange={(e) => setPromptUtama(e.target.value)}
+              />
+            </section>
+
+            <section className={boxStyle}>
+              <div className={label}>Extra (optional)</div>
+              <textarea
+                className="mt-3 w-full min-h-[120px] rounded-xl border border-neutral-200 p-3 text-sm outline-none focus:border-black"
+                placeholder="Tambahan: gaya kamera, lokasi spesifik, outfit, dll..."
+                value={extra}
+                onChange={(e) => setExtra(e.target.value)}
+              />
+            </section>
+
+            <section className={boxStyle}>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className={label}>Final Prompt</div>
+                  {!canCopySave && (
+                    <div className="text-xs text-amber-700 mt-1">
+                      Isi Prompt Utama dulu supaya Copy/Save aktif.
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    className={`${btn} ${!canCopySave ? "opacity-40 cursor-not-allowed" : ""}`}
+                    onClick={() => canCopySave && copyText(finalPrompt)}
+                    disabled={!canCopySave}
+                  >
+                    Copy
+                  </button>
+                  <button
+                    className={`${btnPrimary} ${!canCopySave ? "opacity-40 cursor-not-allowed" : ""}`}
+                    onClick={doSave}
+                    disabled={!canCopySave}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+
+              <pre className="mt-3 whitespace-pre-wrap rounded-xl border border-neutral-200 p-3 text-sm bg-neutral-50">
+                {finalPrompt}
+              </pre>
+            </section>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* SAVED */}
+              <section className={boxStyle}>
+                <div className="flex items-center justify-between">
+                  <div className={label}>Saved Prompts</div>
+                  <div className="text-xs text-neutral-500">{saved.length}</div>
+                </div>
+
+                <div className="mt-3 space-y-2 max-h-[360px] overflow-auto pr-1">
+                  {saved.length === 0 ? (
+                    <div className="text-sm text-neutral-500">Belum ada. Klik Save dulu.</div>
+                  ) : (
+                    saved.map((s) => (
+                      <div
+                        key={s.id}
+                        className="rounded-xl border border-neutral-200 p-3 bg-white"
+                      >
+                        <div className="text-sm font-medium">{s.title}</div>
+                        <div className="text-xs text-neutral-500 mt-1">
+                          {NICHE_LABEL[s.niche]} • {PRESET_LABEL[s.preset]}
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button className={btn} onClick={() => copyText(s.prompt)}>
+                            Copy Prompt
+                          </button>
+                          <button
+                            className={btn}
+                            onClick={() => copyText(`${s.caption}\n\n${s.hashtags.join(" ")}`)}
+                          >
+                            Copy Caption+Tags
+                          </button>
+                          <button className={btn} onClick={() => setFinalPrompt(s.prompt)}>
+                            Load to Final
+                          </button>
+                          <button
+                            className={btn}
+                            onClick={() => {
+                              setNiche(s.niche);
+                              setPreset(s.preset);
+                              setPromptUtama(s.prompt);
+                              setExtra("");
+                            }}
+                          >
+                            Load to Editor
+                          </button>
+                          <button className={btn} onClick={() => removeSaved(s.id)}>
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              {/* HISTORY */}
+              <section className={boxStyle}>
+                <div className="flex items-center justify-between">
+                  <div className={label}>History (Auto Generate)</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs text-neutral-500">{history.length}</div>
+                    <button className={btn} onClick={clearHistory}>
+                      Clear
                     </button>
                   </div>
-                  <div className="mt-2 text-sm text-white/80 line-clamp-3 whitespace-pre-wrap">
-                    {clampText(h.caption, 120)}
-                  </div>
                 </div>
-              ))}
-              {history.length > 6 && (
-                <div className="text-xs text-white/60">+{history.length - 6} item lainnya tersimpan.</div>
-              )}
-            </div>
-          )}
-        </Card>
 
-        <div className="h-4" />
-
-        {/* Saved Prompts */}
-        <Card title="Saved Prompts (local)">
-          {saved.length === 0 ? (
-            <p className="text-white/60 text-sm">Belum ada yang disimpan.</p>
-          ) : (
-            <div className="space-y-3">
-              {saved.slice(0, 8).map((s) => (
-                <div key={s.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-extrabold">
-                      {CHARACTER_LABEL[s.character]} • {NICHE_LABEL[s.niche]}
+                <div className="mt-3 space-y-2 max-h-[360px] overflow-auto pr-1">
+                  {history.length === 0 ? (
+                    <div className="text-sm text-neutral-500">
+                      Klik Auto Generate buat mulai bikin riwayat.
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-400 text-[#071014]"
-                        onClick={() => loadSaved(s)}
+                  ) : (
+                    history.map((h) => (
+                      <div
+                        key={h.id}
+                        className="rounded-xl border border-neutral-200 p-3 bg-white"
                       >
-                        Load
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs font-bold px-3 py-1 rounded-full bg-white/10 hover:bg-white/15"
-                        onClick={() => deleteSaved(s.id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 text-xs text-white/70">
-                    {new Date(s.createdAt).toLocaleString()}
-                  </div>
-
-                  <div className="mt-2 text-sm text-white/80 whitespace-pre-wrap">
-                    {clampText(s.caption, 120)}
-                  </div>
+                        <div className="text-xs text-neutral-500">
+                          {NICHE_LABEL[h.niche]} • {PRESET_LABEL[h.preset]}
+                        </div>
+                        <pre className="mt-2 whitespace-pre-wrap text-xs bg-neutral-50 border border-neutral-200 rounded-xl p-2">
+                          {h.prompt}
+                        </pre>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button className={btn} onClick={() => copyText(h.prompt)}>
+                            Copy
+                          </button>
+                          <button
+                            className={btn}
+                            onClick={() => {
+                              setPromptUtama(h.prompt);
+                              setExtra("");
+                            }}
+                          >
+                            Use as Prompt Utama
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
-              ))}
-              {saved.length > 8 && (
-                <div className="text-xs text-white/60">+{saved.length - 8} item lainnya tersimpan.</div>
-              )}
+              </section>
             </div>
-          )}
-        </Card>
-
-        <footer className="mt-8 text-center text-xs text-white/45">
-          Sora Lite v7 • Mobile-first • No Tags • Character+Niche separated • Caption filter enabled
-        </footer>
-      </div>
-
-      {/* Toast */}
-      {toast ? (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50">
-          <div className="rounded-full bg-black/70 border border-white/10 px-4 py-2 text-sm font-bold text-white shadow-lg backdrop-blur">
-            {toast}
           </div>
         </div>
-      ) : null}
-    </main>
+
+        <footer className="text-xs text-neutral-500 pt-2">
+          Tips: untuk niche <b>Lucu (Hanz × Sweepy)</b>, gunakan Auto Generate berkali-kali — sistem
+          akan inject variasi scenario + ending biar prompt selalu baru.
+        </footer>
+      </div>
+    </div>
   );
 }
