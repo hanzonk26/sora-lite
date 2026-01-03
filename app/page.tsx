@@ -3,27 +3,28 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * Sora Lite — Pro UX + Clean Prompt Logic (FULL REPLACE)
+ * Sora Lite — Pro Prompt Builder (FULL REPLACE)
+ * Focus: UGC Story, Kesehatan, Colab Lucu (Hanz × Sweepy/@mockey.mo)
  *
  * Presets:
  * - General
  * - @hanz26
- * - Sweepy
+ * - Sweepy (@mockey.mo)
  * - Colab (@hanz26 × Sweepy)
  *
  * Niches:
  * - UGC Story Telling: ONLY @hanz26
  * - Kesehatan: ONLY @hanz26
- * - Lucu: @hanz26 / Sweepy / Colab
- * - Trik Sulap: @hanz26 / Colab
+ * - Colab Lucu: @hanz26 / Sweepy / Colab
  *
- * Key fix:
- * - Prompt Utama stays CLEAN (director brief)
- * - Auto Block is separate (idea engine)
- * - Final Prompt composes cleanly (no conflicting double-illusion)
+ * Key UX:
+ * - Prompt Utama = clean director brief (20s, 2 scenes merged)
+ * - Auto Block = idea engine, separated (no messy duplication)
+ * - Final Prompt = Prompt Utama + Auto Block + Extra + output rules
+ * - Copy buttons for Final Prompt, Auto Block, Caption+Tags
  */
 
-type NicheKey = "ugc_story" | "kesehatan" | "lucu" | "sulap";
+type NicheKey = "ugc_story" | "kesehatan" | "colab_lucu";
 type PresetKey = "general" | "hanz26" | "sweepy" | "colab";
 
 type SavedPrompt = {
@@ -48,20 +49,19 @@ type HistoryItem = {
   createdAt: number;
 };
 
-const LS_SAVED = "soraLite.savedPrompts.v2";
-const LS_HISTORY = "soraLite.history.v2";
+const LS_SAVED = "soraLite.savedPrompts.v3";
+const LS_HISTORY = "soraLite.history.v3";
 
 const NICHE_LABEL: Record<NicheKey, string> = {
   ugc_story: "UGC Story Telling",
   kesehatan: "Kesehatan",
-  lucu: "Lucu",
-  sulap: "Trik Sulap",
+  colab_lucu: "Colab Lucu (Hanz × Sweepy)",
 };
 
 const PRESET_LABEL: Record<PresetKey, string> = {
   general: "General (tanpa karakter spesifik)",
   hanz26: "@hanz26",
-  sweepy: "Sweepy",
+  sweepy: "Sweepy (@mockey.mo)",
   colab: "Colab (@hanz26 × Sweepy)",
 };
 
@@ -95,17 +95,15 @@ function safeParse<T>(raw: string | null, fallback: T): T {
   }
 }
 
-/** ---------------- Rules: which preset allowed in which niche ---------------- */
+/** ---------------- Rules: allowed presets per niche ---------------- */
 
 function allowedPresetsForNiche(niche: NicheKey): PresetKey[] {
   switch (niche) {
     case "ugc_story":
     case "kesehatan":
       return ["hanz26"];
-    case "lucu":
+    case "colab_lucu":
       return ["hanz26", "sweepy", "colab"];
-    case "sulap":
-      return ["hanz26", "colab"];
   }
 }
 
@@ -118,11 +116,10 @@ function enforcePreset(niche: NicheKey, preset: PresetKey): PresetKey {
 /** ---------------- Prompt Utama templates (clean director brief) ---------------- */
 
 function defaultPromptUtama(niche: NicheKey, preset: PresetKey) {
-  // Clean, detailed, 20s, 2 scenes merged (as user requested).
-  // Keep it as "director brief" (what happens), not auto idea dump.
   const base = `Durasi total ±20 detik, dibagi 2 scene (masing-masing ±10 detik), DIGABUNG jadi 1 video utuh.
 Bahasa Indonesia santai, UGC natural, tanpa narrator panjang, ekspresi autentik.
-Hook kuat di 2 detik pertama. Ending punchline/reveal yang bikin replay.`;
+Hook kuat di 2 detik pertama. Ending punchline/reveal yang bikin replay.
+Kontinuitas: lokasi/outfit/karakter konsisten di dua scene.`;
 
   if (niche === "ugc_story") {
     return clampText(`${base}
@@ -148,134 +145,118 @@ Tunjukin langkahnya singkat (1–2 step) + contoh real.
 Ending: reminder halus “kalau punya kondisi khusus, konsultasi profesional”.`);
   }
 
-  if (niche === "sulap") {
-    const who =
-      preset === "colab"
-        ? "Karakter: @hanz26 dan Sweepy tampil bareng, Sweepy jadi pengganggu lucu."
-        : "Karakter: @hanz26 saja, vibe magician santai.";
-    return clampText(`${base}
-${who}
-
-SCENE 1 (0–10 detik):
-Setup cepat (prop terlihat jelas). Jelaskan 1 kalimat saja: “Jangan kedip.”
-Arahkan kamera untuk fokus tangan/prop.
-
-SCENE 2 (10–20 detik):
-1 ilusi utama terjadi (hanya SATU trik).
-Reaksi jujur + punchline singkat. Jangan jelaskan metode.`);
-  }
-
-  // lucu
+  // colab_lucu
   const cast =
     preset === "colab"
-      ? "Cast: @hanz26 + Sweepy (duo chaos)."
+      ? "Cast: @hanz26 + Sweepy (@mockey.mo) (duo chaos)."
       : preset === "sweepy"
-      ? "Cast: Sweepy saja (monyet lucu yang super random)."
+      ? "Cast: Sweepy (@mockey.mo) saja (monyet lucu super random)."
       : "Cast: @hanz26 saja (komedi natural).";
 
   return clampText(`${base}
 ${cast}
 
 SCENE 1 (0–10 detik):
-Situasi normal sehari-hari, lalu gangguan lucu muncul (conflict kecil).
+Situasi normal sehari-hari (yang relatable), lalu konflik lucu muncul (gangguan kecil).
 Dialog pendek, cepat, natural.
 
 SCENE 2 (10–20 detik):
-Gangguan makin absurd tapi masih believable.
-@hanz26 bereaksi spontan (atau Sweepy makin sok pintar).
-Ending: punchline visual atau 1 kalimat yang nancep.`);
+Konflik makin absurd tapi masih believable.
+Reaksi spontan (kaget/ketawa/pasrah).
+Ending: punchline visual atau 1 kalimat yang nancep (cut tepat di momen lucu).`);
 }
 
-/** ---------------- Random pools (for Auto Block only) ---------------- */
+/** ---------------- Random pools for Auto Block (absurd conflict engine) ---------------- */
 
 const UGC_LOCATIONS = [
   "di kamar sederhana dengan cahaya natural pagi",
   "di teras rumah sore hari",
   "di coffee shop kecil yang tenang",
-  "di meja kerja dengan laptop (vlog feel)",
+  "di meja kerja dengan laptop",
   "di dapur rumah, suasana santai",
 ];
 
 const UGC_CAMERA = [
-  "eye-level handheld ringan, sedikit goyang natural",
-  "tripod statis, framing dada ke atas",
-  "close-up halus untuk ekspresi, fokus wajah",
-  "angle sedikit samping, terasa candid",
+  "handheld vlog feel (subtle shake), quick punchy cuts",
+  "static tripod base + quick handheld reaction inserts",
+  "over-the-shoulder alternating to reaction shots",
+  "eye-level candid, slight side angle, feels real",
 ];
 
-const UGC_VIBE = ["natural", "hangat", "relatable", "sedikit kocak", "calm tapi engaging"];
+const COMEDY_VIBES = ["absurd tapi believable", "chaos lucu", "deadpan humor", "fast banter", "awkward silence cut"];
 
-const STORY_THEMES = [
-  "kejadian kecil yang bikin sadar sesuatu",
-  "momen random yang ternyata relate",
-  "cerita ‘gue kira begini, ternyata begitu’",
-  "kebiasaan kecil yang ngaruh ke mood",
+const HZ_ACTIVITIES = [
+  "lagi bikin kopi dan mau tampil ‘serius’",
+  "lagi kerja di laptop (deadline vibe)",
+  "lagi beres-beres meja biar rapi",
+  "lagi setting kamera buat bikin konten",
+  "lagi siap olahraga tapi malas",
+  "lagi masak mie instan ala anak kos",
 ];
 
-const HEALTH_TOPICS = [
-  "minum air lebih konsisten",
-  "sleep routine simpel",
-  "jalan kaki 10 menit setelah makan",
-  "ngurangin gula pelan-pelan",
-  "napas 60 detik buat nurunin tegang",
-  "piring sehat versi gampang",
+const SWEEPY_MOTIVES = [
+  "ngaku jadi ‘manager’",
+  "ngaku jadi ‘chef’",
+  "ngaku jadi ‘coach’",
+  "ngaku jadi ‘sutradara’",
+  "ngaku jadi ‘life coach’",
+  "ngaku jadi ‘security’",
 ];
 
-const MAGIC_PROPS = ["kartu", "koin", "karet gelang", "tisu", "pulpen", "gelas plastik"];
+const SWEEPY_TRAITS = ["ngeyel", "sok pintar", "overconfident", "super random", "jail tapi gemes", "serius lucu"];
 
-const MAGIC_ILLUSIONS = [
-  "kartu berubah jadi kartu lain dalam 1 detik",
-  "koin lenyap lalu muncul kembali dekat kamera",
-  "karet gelang tembus jari dengan close-up",
-  "tisu sobek lalu tiba-tiba utuh lagi",
+const ABSURD_ACTIONS = [
+  "ngasih aturan aneh yang bikin ribet",
+  "nyelonong ambil properti penting terus pura-pura polos",
+  "ngubah sesuatu diam-diam pas kamera on",
+  "masuk frame pas momen paling serius",
+  "nyuruh @hanz26 ngulang take berkali-kali",
+  "bikin ‘tes’ absurd yang gak ada hubungannya",
 ];
 
-const COMEDY_SITUATIONS = [
-  "lagi ngopi, Sweepy ngaku barista dan bikin drama",
-  "lagi kerja di laptop, Sweepy jadi ‘manager’ nyuruh-nyuruh",
-  "lagi bersih-bersih, Sweepy kasih ‘teknik’ absurd",
-  "lagi bikin konten, Sweepy nyelonong minta cameo",
-  "lagi siap olahraga, Sweepy pemanasan aneh",
-];
-
-const SWEEPY_TRAITS = ["ngeyel", "sok pintar", "jail", "super random", "overconfident", "gemes tapi ngeselin"];
-
-const COMEDY_ENDINGS = [
-  "ending: @hanz26 ketawa pasrah dan bilang 1 kalimat lucu",
-  "ending: Sweepy senyum puas, cut tepat di momen awkward",
-  "ending: freeze beat 0.5 detik, lalu mereka tatap-tatapan, cut",
-  "ending: @hanz26 ‘yaudah lah’ sambil facepalm ringan",
+const PUNCHLINES = [
+  "ending: @hanz26 ketawa pasrah: “yaudah, gue ikut lo…” (cut)",
+  "ending: Sweepy senyum puas sambil angguk-angguk (cut pas awkward)",
+  "ending: freeze beat 0.5 detik, mereka tatap-tatapan, cut lucu",
+  "ending: @hanz26 facepalm ringan: “ini siapa yang ngundang?” (cut)",
+  "ending: ternyata Sweepy yang rekam semua dari tadi (reveal cepat)",
 ];
 
 function uniquenessToken() {
   return Math.random().toString(36).slice(2, 8);
 }
 
-/** ---------------- Auto Block builders (style + idea details only) ---------------- */
+/** ---------------- Auto Block builders (style + detailed conflict only) ---------------- */
 
 function autoBlockUGCStory() {
   const loc = pick(UGC_LOCATIONS);
-  const cam = pick(UGC_CAMERA);
-  const vibe = pick(UGC_VIBE);
-  const theme = pick(STORY_THEMES);
+  const cam = pick(["tripod statis, framing dada ke atas", "handheld ringan, natural goyang"]);
+  const vibe = pick(["hangat", "relatable", "jujur", "reflektif tapi santai"]);
+  const theme = pick(["kejadian kecil yang bikin sadar sesuatu", "momen random yang relate", "gue kira begini, ternyata begitu"]);
 
   return clampText(`
 AUTO BLOCK (STYLE + DETAILS):
 Character: @hanz26 (consistent look).
-Vibe: ${vibe}, conversational, first-person.
+Vibe: ${vibe}, first-person storytelling.
 Theme suggestion: ${theme}.
 Setting: ${loc}.
 Camera: ${cam}.
-Pacing: quick hook, then smooth delivery, natural pauses.
-Tech: vertical 9:16, duration ~20s, natural room tone.
+Pacing: hook 2 detik → cerita singkat → twist kecil → closing hangat.
+Tech: vertical 9:16, ~20s, natural room tone.
 Uniqueness token: ${uniquenessToken()}
 `);
 }
 
 function autoBlockHealth() {
   const loc = pick(UGC_LOCATIONS);
-  const cam = pick(UGC_CAMERA);
-  const topic = pick(HEALTH_TOPICS);
+  const cam = pick(["tripod statis, framing dada ke atas", "handheld ringan, natural goyang"]);
+  const topic = pick([
+    "minum air lebih konsisten",
+    "sleep routine simpel",
+    "jalan kaki 10 menit setelah makan",
+    "napas 60 detik buat nurunin tegang",
+    "ngurangin gula pelan-pelan",
+  ]);
 
   return clampText(`
 AUTO BLOCK (STYLE + DETAILS):
@@ -284,68 +265,50 @@ Topic suggestion: ${topic}.
 Tone: friendly, non-medical, no “menyembuhkan/pasti”.
 Setting: ${loc}.
 Camera: ${cam}.
-Pacing: 1 problem → 1 habit → 1 simple step.
-Tech: vertical 9:16, duration ~20s, natural room tone.
+Structure: 1 problem → 1 habit → 1 step contoh → reminder halus.
+Tech: vertical 9:16, ~20s, natural room tone.
 Uniqueness token: ${uniquenessToken()}
 `);
 }
 
-function autoBlockMagic(preset: PresetKey) {
-  const prop = pick(MAGIC_PROPS);
-  const illusion = pick(MAGIC_ILLUSIONS);
-  const cam = pick([
-    "close-up on hands, then quick refocus to reaction",
-    "over-shoulder angle, snap zoom at reveal",
-    "stable tight framing, object always visible",
-  ]);
-
-  const cast =
-    preset === "colab"
-      ? "Cast: @hanz26 + Sweepy (Sweepy jadi pengganggu lucu, tapi trik tetap 1)."
-      : "Cast: @hanz26 saja.";
-
-  return clampText(`
-AUTO BLOCK (STYLE + DETAILS):
-${cast}
-Prop suggestion: ${prop}.
-ONE illusion only: ${illusion}.
-Camera: ${cam}.
-Direction: do NOT explain the method. One clean reveal.
-Ending: real reaction + short punchline.
-Tech: vertical 9:16, duration ~20s, natural room tone.
-Uniqueness token: ${uniquenessToken()}
-`);
-}
-
-function autoBlockFunny(preset: PresetKey) {
-  const situation = pick(COMEDY_SITUATIONS);
-  const trait = pick(SWEEPY_TRAITS);
-  const ending = pick(COMEDY_ENDINGS);
+function autoBlockColabFunny(preset: PresetKey) {
   const loc = pick(UGC_LOCATIONS);
-  const cam = pick([
-    "handheld vlog feel (subtle shake), quick punchy cuts",
-    "static tripod base + quick handheld reaction inserts",
-    "over-shoulder alternating to reaction shots",
-  ]);
+  const cam = pick(UGC_CAMERA);
+  const vibe = pick(COMEDY_VIBES);
+
+  const activity = pick(HZ_ACTIVITIES);
+  const motive = pick(SWEEPY_MOTIVES);
+  const trait = pick(SWEEPY_TRAITS);
+  const absurd = pick(ABSURD_ACTIONS);
+  const ending = pick(PUNCHLINES);
 
   const cast =
     preset === "colab"
-      ? "Cast: @hanz26 + Sweepy (interacting naturally)."
+      ? "Cast: @hanz26 (human) + Sweepy (@mockey.mo) (cute monkey). They must interact on screen."
       : preset === "sweepy"
-      ? "Cast: Sweepy only (monkey comedy)."
-      : "Cast: @hanz26 only (self comedy).";
+      ? "Cast: Sweepy (@mockey.mo) only. (Monkey POV humor, still UGC style.)"
+      : "Cast: @hanz26 only. (Self comedy, still feels real.)";
+
+  // For the user's focus: "konflik lucu absurd yang selalu ada antara hanz & sweepy"
+  // We'll bias the prompt to always include conflict even if preset isn't colab.
+  const conflictLine =
+    preset === "colab"
+      ? `Conflict: Sweepy ${motive} dan ${trait}, lalu ${absurd}. @hanz26 bereaksi spontan.`
+      : `Conflict: ada gangguan lucu yang memicu reaksi spontan (absurd tapi believable).`;
 
   return clampText(`
-AUTO BLOCK (STYLE + DETAILS):
+AUTO BLOCK (CONFLICT ENGINE):
 ${cast}
-Scenario suggestion: ${situation}.
-Sweepy personality (if present): ${trait}.
+Vibe: ${vibe}.
 Setting: ${loc}.
 Camera: ${cam}.
-Dialog: casual Indonesian, short back-and-forth, no narrator.
-Humor: absurd-but-believable.
+Base situation: @hanz26 ${activity}.
+${conflictLine}
+Dialog: bahasa Indonesia santai, cepat, back-and-forth (tanpa narrator).
+Continuity: scene 1 dan 2 di lokasi yang sama, outfit sama, flow nyambung.
+Timing guide: 0–2s hook (gangguan muncul cepat) → 2–10s escalation → 10–18s chaos peak → 18–20s punchline.
 ${ending}
-Tech: vertical 9:16, duration ~20s, natural room tone.
+Tech: vertical 9:16, ~20s, natural room tone.
 Uniqueness token: ${uniquenessToken()}
 `);
 }
@@ -356,10 +319,8 @@ function buildAutoBlock(niche: NicheKey, preset: PresetKey) {
       return autoBlockUGCStory();
     case "kesehatan":
       return autoBlockHealth();
-    case "sulap":
-      return autoBlockMagic(preset);
-    case "lucu":
-      return autoBlockFunny(preset);
+    case "colab_lucu":
+      return autoBlockColabFunny(preset);
   }
 }
 
@@ -369,19 +330,23 @@ function generateCaptionAndHashtags(niche: NicheKey, preset: PresetKey) {
   const baseCaption: Record<NicheKey, string[]> = {
     ugc_story: ["Cerita kecil, tapi relate. 😅", "Ini kejadian receh… tapi ngena.", "Kadang yang simpel itu paling nempel."],
     kesehatan: ["Kebiasaan kecil, efeknya kerasa. 💧", "Nggak harus perfect, yang penting konsisten.", "Reminder halus buat hari ini."],
-    lucu: ["Cuma mau normal… tapi ya gitu. 😂", "Chaos tipis tapi nagih.", "Yang satu serius, yang satu random."],
-    sulap: ["Jangan kedip. Serius. 😳", "Kalau bisa nebak, kamu jago.", "Oke ini kok bisa?!"],
+    colab_lucu: ["Duo chaos lagi beraksi… 😂", "Normalnya sebentar, chaosnya lama.", "Yang satu serius, yang satu random."],
   };
 
   const tagPool: Record<NicheKey, string[]> = {
     ugc_story: ["ugc", "storytime", "relate", "kontenharian", "fyp"],
     kesehatan: ["kesehatan", "sehat", "habit", "selfimprovement", "fyp"],
-    lucu: ["lucu", "komedi", "viral", "reels", "fyp"],
-    sulap: ["sulap", "magic", "illusion", "trik", "fyp"],
+    colab_lucu: ["lucu", "komedi", "viral", "reels", "fyp"],
   };
 
   const presetTag =
-    preset === "hanz26" ? ["hanz26"] : preset === "sweepy" ? ["sweepy"] : preset === "colab" ? ["hanz26", "sweepy"] : [];
+    preset === "hanz26"
+      ? ["hanz26"]
+      : preset === "sweepy"
+      ? ["mockeymo", "sweepy"]
+      : preset === "colab"
+      ? ["hanz26", "mockeymo", "sweepy"]
+      : [];
 
   const caption = pick(baseCaption[niche]);
   const tags = shuffle([...tagPool[niche], ...presetTag]).slice(0, 5).map((t) => `#${t}`);
@@ -394,12 +359,8 @@ export default function Page() {
   const [niche, setNiche] = useState<NicheKey>("ugc_story");
   const [preset, setPreset] = useState<PresetKey>("hanz26");
 
-  // Clean director brief (Prompt Utama)
   const [promptUtama, setPromptUtama] = useState<string>("");
-
-  // Auto block (idea/style engine)
   const [autoBlock, setAutoBlock] = useState<string>("");
-
   const [extra, setExtra] = useState<string>("");
 
   const [finalPrompt, setFinalPrompt] = useState<string>("");
@@ -415,51 +376,51 @@ export default function Page() {
   const allowedPresets = useMemo(() => allowedPresetsForNiche(niche), [niche]);
 
   useEffect(() => {
-    // load storage
     const s = safeParse<SavedPrompt[]>(localStorage.getItem(LS_SAVED), []);
     const h = safeParse<HistoryItem[]>(localStorage.getItem(LS_HISTORY), []);
     setSaved(s);
     setHistory(h);
   }, []);
 
-  // Enforce preset when niche changes
   useEffect(() => {
+    // enforce preset on niche switch
     if (enforcedPreset !== preset) setPreset(enforcedPreset);
 
-    // Update default prompt utama if empty (or when switching niche & user hasn't typed much)
-    setPromptUtama((prev) => (prev.trim().length > 10 ? prev : defaultPromptUtama(niche, enforcePreset(niche, preset))));
+    // set default prompt utama if empty/short
+    setPromptUtama((prev) =>
+      prev.trim().length > 10 ? prev : defaultPromptUtama(niche, enforcePreset(niche, preset))
+    );
 
-    // Refresh caption/tags based on niche+enforced preset
+    // refresh caption/tags
     const ch = generateCaptionAndHashtags(niche, enforcePreset(niche, preset));
     setCaption(ch.caption);
     setHashtags(ch.hashtags);
 
-    // Clear autoBlock when switching niche (optional but makes it feel clean)
+    // clear autoBlock when switching niche for cleanliness
     setAutoBlock("");
   }, [niche]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Also enforce preset if user changes it to invalid one
   useEffect(() => {
+    // enforce preset if user tries invalid
     if (preset !== enforcedPreset) setPreset(enforcedPreset);
   }, [enforcedPreset]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Compose final prompt cleanly
   useEffect(() => {
     const merged = clampText(`
 PROMPT UTAMA (DIRECTOR BRIEF):
 ${promptUtama.trim() || "(Isi Prompt Utama dulu)"}
 
-AUTO BLOCK (STYLE + IDEA DETAILS):
+AUTO BLOCK (STYLE + CONFLICT DETAILS):
 ${autoBlock.trim() || "(Klik Auto Generate)"}
 
 EXTRA (OPTIONAL):
 ${extra.trim() || "-"}
 
 OUTPUT RULES:
-- One coherent 20s video, 2 scenes merged (0–10s and 10–20s).
+- One coherent ~20s video, 2 scenes merged (0–10s and 10–20s).
 - Keep continuity of location/outfit/characters between scenes.
-- Avoid conflicting actions: one main gag/illusion per video.
-- Vertical 9:16, UGC natural feel.
+- No conflicting main gags: keep one core conflict thread.
+- Vertical 9:16, UGC natural feel, authentic reactions.
 `);
     setFinalPrompt(merged);
   }, [promptUtama, autoBlock, extra]);
@@ -475,17 +436,14 @@ OUTPUT RULES:
   }
 
   function doAutoGenerate() {
-    // Always new-ish: avoid same as lastAutoRef
     let out = "";
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
       out = buildAutoBlock(niche, preset);
       if (clampText(out) !== clampText(lastAutoRef.current)) break;
     }
     lastAutoRef.current = out;
-
     setAutoBlock(out);
 
-    // History store AutoBlock only (not polluting Prompt Utama)
     const item: HistoryItem = {
       id: uid("hist"),
       niche,
@@ -493,7 +451,7 @@ OUTPUT RULES:
       autoBlock: out,
       createdAt: Date.now(),
     };
-    persistHistory([item, ...history].slice(0, 80));
+    persistHistory([item, ...history].slice(0, 120));
   }
 
   async function copyText(text: string) {
@@ -527,7 +485,7 @@ OUTPUT RULES:
       createdAt: Date.now(),
     };
 
-    persistSaved([item, ...saved].slice(0, 200));
+    persistSaved([item, ...saved].slice(0, 250));
     setCaption(ch.caption);
     setHashtags(ch.hashtags);
   }
@@ -540,10 +498,10 @@ OUTPUT RULES:
     persistHistory([]);
   }
 
-  /** ---------------- Soft Blue Pro Theme ---------------- */
+  /** ---------------- Pro Soft Blue Theme ---------------- */
 
   const shell =
-    "min-h-screen bg-[radial-gradient(1200px_700px_at_20%_10%,rgba(59,130,246,0.20),transparent),radial-gradient(900px_600px_at_80%_30%,rgba(99,102,241,0.15),transparent),linear-gradient(to_bottom,rgba(2,6,23,1),rgba(15,23,42,1),rgba(2,6,23,1))] text-slate-100";
+    "min-h-screen bg-[radial-gradient(1200px_700px_at_20%_10%,rgba(59,130,246,0.22),transparent),radial-gradient(900px_600px_at_80%_30%,rgba(99,102,241,0.16),transparent),linear-gradient(to_bottom,rgba(2,6,23,1),rgba(15,23,42,1),rgba(2,6,23,1))] text-slate-100";
 
   const card =
     "border border-blue-900/40 rounded-2xl p-4 md:p-5 shadow-[0_18px_60px_rgba(0,0,0,0.35)] bg-blue-950/35 backdrop-blur";
@@ -569,7 +527,8 @@ OUTPUT RULES:
   const smallPre =
     "mt-3 whitespace-pre-wrap rounded-xl border border-blue-900/40 p-3 text-xs bg-blue-950/25 text-slate-100";
 
-  const canCopy = finalPrompt.trim().length > 0;
+  const canCopyFinal = finalPrompt.trim().length > 0;
+  const canCopyAuto = autoBlock.trim().length > 0;
 
   return (
     <div className={shell}>
@@ -577,9 +536,10 @@ OUTPUT RULES:
         <header className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-2xl md:text-3xl font-semibold">Sora Lite — Pro Prompt Builder</h1>
+              <h1 className="text-2xl md:text-3xl font-semibold">Sora Lite — Colab Focus</h1>
               <p className="text-sm text-blue-300/60 mt-1">
-                Preset & Niche rules dibuat supaya hasil prompt tidak berantakan dan lebih “Sora-ready”.
+                Fokus konflik lucu & absurd antara <b className="text-blue-200">@hanz26</b> dan{" "}
+                <b className="text-blue-200">Sweepy (@mockey.mo)</b>, plus niche UGC story & kesehatan.
               </p>
             </div>
 
@@ -588,9 +548,7 @@ OUTPUT RULES:
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
                 Clean Prompt Mode
               </span>
-              <span className="text-xs text-blue-300/60">
-                20 detik • 2 scene • 1 video utuh
-              </span>
+              <span className="text-xs text-blue-300/60">20 detik • 2 scene • 1 video utuh</span>
             </div>
           </div>
 
@@ -616,14 +574,16 @@ OUTPUT RULES:
             <section className={card}>
               <div className={cardTitle}>Niche</div>
               <div className={subText}>
-                UGC Story & Kesehatan khusus @hanz26. Lucu bisa Hanz/Sweepy/Colab. Sulap bisa Hanz/Colab.
+                UGC Story & Kesehatan khusus @hanz26. Colab Lucu bisa @hanz26 / Sweepy / Colab.
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {(["ugc_story", "kesehatan", "lucu", "sulap"] as NicheKey[]).map((k) => (
+              <div className="mt-3 grid grid-cols-1 gap-2">
+                {(["ugc_story", "kesehatan", "colab_lucu"] as NicheKey[]).map((k) => (
                   <button
                     key={k}
-                    className={`${btn} ${niche === k ? "border-blue-300/70 bg-blue-900/20 ring-1 ring-blue-400/25" : ""}`}
+                    className={`${btn} ${
+                      niche === k ? "border-blue-300/70 bg-blue-900/20 ring-1 ring-blue-400/25" : ""
+                    }`}
                     onClick={() => setNiche(k)}
                   >
                     {NICHE_LABEL[k]}
@@ -640,16 +600,14 @@ OUTPUT RULES:
                 {(["general", "hanz26", "sweepy", "colab"] as PresetKey[]).map((k) => {
                   const allowed = allowedPresets.includes(k);
                   const selected = preset === k && enforcedPreset === k;
-
-                  // show locked if not allowed
                   const locked = !allowed;
 
                   return (
                     <button
                       key={k}
-                      className={`${btn} ${selected ? "border-blue-300/70 bg-blue-900/20 ring-1 ring-blue-400/25" : ""} ${
-                        locked ? "opacity-40 cursor-not-allowed" : ""
-                      }`}
+                      className={`${btn} ${
+                        selected ? "border-blue-300/70 bg-blue-900/20 ring-1 ring-blue-400/25" : ""
+                      } ${locked ? "opacity-40 cursor-not-allowed" : ""}`}
                       onClick={() => {
                         if (!locked) setPreset(k);
                       }}
@@ -674,7 +632,7 @@ OUTPUT RULES:
             <section className={card}>
               <div className={cardTitle}>Auto Generate</div>
               <div className={subText}>
-                Auto Generate hanya mengisi <b>Auto Block</b> (style + detail ide), tidak mengotori Prompt Utama.
+                Auto Generate mengisi <b>Auto Block</b> (style + konflik detail). Prompt Utama tetap clean.
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -690,6 +648,25 @@ OUTPUT RULES:
                   }}
                 >
                   Refresh Caption/Tags
+                </button>
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  className={`${btn} ${!canCopyAuto ? "opacity-40 cursor-not-allowed" : ""}`}
+                  disabled={!canCopyAuto}
+                  onClick={() => copyText(autoBlock)}
+                >
+                  Copy Auto Block
+                </button>
+                <button
+                  className={`${btn} ${!canCopyAuto ? "opacity-40 cursor-not-allowed" : ""}`}
+                  disabled={!canCopyAuto}
+                  onClick={() =>
+                    setExtra((prev) => clampText(`${prev}\n\n# AUTO BLOCK (appended)\n${autoBlock}`))
+                  }
+                >
+                  Append to Extra
                 </button>
               </div>
 
@@ -725,7 +702,7 @@ OUTPUT RULES:
                 <div>
                   <div className={cardTitle}>Prompt Utama (Clean & Detail)</div>
                   <div className={subText}>
-                    Ini “sutradara”-nya: 20 detik, 2 scene digabung, alur jelas. Auto Block hanya membantu style/detail.
+                    Ini “sutradara”-nya: 20 detik, 2 scene digabung, alur jelas. Konflik detail ada di Auto Block.
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -739,16 +716,17 @@ OUTPUT RULES:
               </div>
 
               <textarea
-                className={`${textarea} min-h-[220px]`}
+                className={`${textarea} min-h-[240px]`}
                 value={promptUtama}
                 onChange={(e) => setPromptUtama(e.target.value)}
                 placeholder="Tulis arahan sutradara: durasi, 2 scene, hook, dialog, ending..."
               />
 
               <div className="mt-3 flex flex-wrap gap-2">
-                <span className={pill}>Tip: tulis 1 cerita / 1 trik utama saja</span>
-                <span className={pill}>Hook 2 detik pertama</span>
-                <span className={pill}>Ending punchline / reveal</span>
+                <span className={pill}>Hook 0–2 detik</span>
+                <span className={pill}>Konflik naik di scene 1</span>
+                <span className={pill}>Payoff punchline di scene 2</span>
+                <span className={pill}>Cut tepat saat lucu</span>
               </div>
             </section>
 
@@ -768,12 +746,16 @@ OUTPUT RULES:
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <div className={cardTitle}>Final Prompt</div>
-                  <div className={subText}>Sudah dibersihkan: Prompt Utama + Auto Block + Extra (tanpa konflik).</div>
+                  <div className={subText}>Sudah clean: Prompt Utama + Auto Block + Extra.</div>
                 </div>
 
                 <div className="flex gap-2">
-                  <button className={`${btn} ${!canCopy ? "opacity-40 cursor-not-allowed" : ""}`} disabled={!canCopy} onClick={() => copyText(finalPrompt)}>
-                    Copy Prompt
+                  <button
+                    className={`${btn} ${!canCopyFinal ? "opacity-40 cursor-not-allowed" : ""}`}
+                    disabled={!canCopyFinal}
+                    onClick={() => copyText(finalPrompt)}
+                  >
+                    Copy Final Prompt
                   </button>
                   <button className={btnPrimary} onClick={doSave}>
                     Save
@@ -874,8 +856,7 @@ OUTPUT RULES:
         </div>
 
         <footer className="text-xs text-blue-300/60 pt-2">
-          Pro tip: untuk hasil paling konsisten, pastikan <b className="text-blue-200">Prompt Utama</b> hanya 1 cerita / 1 trik utama.
-          Auto Generate boleh berkali-kali untuk cari variasi detail.
+          Fokus colab: klik Auto Generate berkali-kali sampai dapat konflik yang paling lucu. Prompt Utama tetap clean untuk menjaga output video konsisten.
         </footer>
       </div>
     </div>
