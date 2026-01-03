@@ -3,8 +3,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * Sora Lite — Pro Prompt Builder (FULL REPLACE)
- * Focus: UGC Story, Kesehatan, Colab Lucu (Hanz × Sweepy/@mockey.mo)
+ * Sora Lite — Colab Focus (FULL REPLACE) — Nonverbal Sweepy (@mockey.mo)
+ *
+ * Focus niches:
+ * - UGC Story Telling (ONLY @hanz26)
+ * - Kesehatan (ONLY @hanz26)
+ * - Colab Lucu (Hanz × Sweepy) (can be @hanz26 / Sweepy / Colab)
  *
  * Presets:
  * - General
@@ -12,16 +16,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
  * - Sweepy (@mockey.mo)
  * - Colab (@hanz26 × Sweepy)
  *
- * Niches:
- * - UGC Story Telling: ONLY @hanz26
- * - Kesehatan: ONLY @hanz26
- * - Colab Lucu: @hanz26 / Sweepy / Colab
- *
- * Key UX:
- * - Prompt Utama = clean director brief (20s, 2 scenes merged)
- * - Auto Block = idea engine, separated (no messy duplication)
- * - Final Prompt = Prompt Utama + Auto Block + Extra + output rules
- * - Copy buttons for Final Prompt, Auto Block, Caption+Tags
+ * Key rule:
+ * - Sweepy NEVER speaks human language.
+ * - Sweepy understands @hanz26 and reacts nonverbally (gestures/expressions/monkey sounds).
  */
 
 type NicheKey = "ugc_story" | "kesehatan" | "colab_lucu";
@@ -49,8 +46,8 @@ type HistoryItem = {
   createdAt: number;
 };
 
-const LS_SAVED = "soraLite.savedPrompts.v3";
-const LS_HISTORY = "soraLite.history.v3";
+const LS_SAVED = "soraLite.savedPrompts.v4";
+const LS_HISTORY = "soraLite.history.v4";
 
 const NICHE_LABEL: Record<NicheKey, string> = {
   ugc_story: "UGC Story Telling",
@@ -150,15 +147,19 @@ Ending: reminder halus “kalau punya kondisi khusus, konsultasi profesional”.
     preset === "colab"
       ? "Cast: @hanz26 + Sweepy (@mockey.mo) (duo chaos)."
       : preset === "sweepy"
-      ? "Cast: Sweepy (@mockey.mo) saja (monyet lucu super random)."
+      ? "Cast: Sweepy (@mockey.mo) saja (monyet pintar super random)."
       : "Cast: @hanz26 saja (komedi natural).";
 
   return clampText(`${base}
 ${cast}
 
+RULE KOMUNIKASI (WAJIB):
+Sweepy tidak berbicara seperti manusia. Sweepy hanya merespon nonverbal (gesture/ekspresi/suara monyet kecil) tapi paham omongan @hanz26.
+Subtitle hanya untuk kalimat @hanz26. Reaksi Sweepy cukup caption pendek seperti (angguk), (geleng), (bingung), (panik kecil).
+
 SCENE 1 (0–10 detik):
 Situasi normal sehari-hari (yang relatable), lalu konflik lucu muncul (gangguan kecil).
-Dialog pendek, cepat, natural.
+@hanz26 ngomong 1–2 kalimat singkat. Sweepy merespon nonverbal.
 
 SCENE 2 (10–20 detik):
 Konflik makin absurd tapi masih believable.
@@ -212,6 +213,15 @@ const ABSURD_ACTIONS = [
   "masuk frame pas momen paling serius",
   "nyuruh @hanz26 ngulang take berkali-kali",
   "bikin ‘tes’ absurd yang gak ada hubungannya",
+];
+
+const SWEEPY_NONVERBAL_REACTIONS = [
+  "Sweepy mengangguk cepat lalu menunjuk-nunjuk (seolah paham)",
+  "Sweepy geleng keras sambil bikin suara chitter kecil",
+  "Sweepy menatap kamera, lalu menatap @hanz26, lalu facepalm versi monyet",
+  "Sweepy pura-pura serius: lipat tangan, angguk pelan, lalu tiba-tiba jahil",
+  "Sweepy mengeluarkan suara kecil ‘chit-chit’ dan menunjuk benda penting",
+  "Sweepy meniru gerakan @hanz26 dengan ekspresi overconfident",
 ];
 
 const PUNCHLINES = [
@@ -280,34 +290,47 @@ function autoBlockColabFunny(preset: PresetKey) {
   const motive = pick(SWEEPY_MOTIVES);
   const trait = pick(SWEEPY_TRAITS);
   const absurd = pick(ABSURD_ACTIONS);
+  const reaction = pick(SWEEPY_NONVERBAL_REACTIONS);
   const ending = pick(PUNCHLINES);
 
   const cast =
     preset === "colab"
-      ? "Cast: @hanz26 (human) + Sweepy (@mockey.mo) (cute monkey). They must interact on screen."
+      ? "Cast: @hanz26 (human) + Sweepy (@mockey.mo) (smart cute monkey). They must interact on screen."
       : preset === "sweepy"
-      ? "Cast: Sweepy (@mockey.mo) only. (Monkey POV humor, still UGC style.)"
+      ? "Cast: Sweepy (@mockey.mo) only. Smart monkey acting; NO human speech; reacts to off-camera @hanz26 voice or environment."
       : "Cast: @hanz26 only. (Self comedy, still feels real.)";
 
-  // For the user's focus: "konflik lucu absurd yang selalu ada antara hanz & sweepy"
-  // We'll bias the prompt to always include conflict even if preset isn't colab.
   const conflictLine =
     preset === "colab"
-      ? `Conflict: Sweepy ${motive} dan ${trait}, lalu ${absurd}. @hanz26 bereaksi spontan.`
+      ? `Conflict: Sweepy ${motive} dan ${trait}, lalu ${absurd}. ${reaction}. @hanz26 bereaksi spontan.`
       : `Conflict: ada gangguan lucu yang memicu reaksi spontan (absurd tapi believable).`;
 
   return clampText(`
-AUTO BLOCK (CONFLICT ENGINE):
+AUTO BLOCK (CONFLICT ENGINE — NONVERBAL SWEEPY):
 ${cast}
+
+Communication rules (STRICT):
+- Sweepy does NOT speak human language (no human-like voice).
+- Sweepy communicates only with natural monkey sounds (chitter), facial expressions, gestures (pointing), nod/shake head.
+- @hanz26 speaks casual Indonesian in SHORT lines; Sweepy understands and reacts NONVERBALLY.
+Subtitles:
+- Subtitle only @hanz26 lines.
+- Optional short reaction captions for Sweepy like: "(angguk)", "(geleng)", "(bingung)", "(panik kecil)", "(jahil)".
+
 Vibe: ${vibe}.
 Setting: ${loc}.
 Camera: ${cam}.
 Base situation: @hanz26 ${activity}.
 ${conflictLine}
-Dialog: bahasa Indonesia santai, cepat, back-and-forth (tanpa narrator).
+
+Dialog:
+- @hanz26: Indonesian casual, short lines.
+- Sweepy: NONVERBAL only (gesture/sound), no spoken words.
+
 Continuity: scene 1 dan 2 di lokasi yang sama, outfit sama, flow nyambung.
 Timing guide: 0–2s hook (gangguan muncul cepat) → 2–10s escalation → 10–18s chaos peak → 18–20s punchline.
 ${ending}
+
 Tech: vertical 9:16, ~20s, natural room tone.
 Uniqueness token: ${uniquenessToken()}
 `);
@@ -330,7 +353,7 @@ function generateCaptionAndHashtags(niche: NicheKey, preset: PresetKey) {
   const baseCaption: Record<NicheKey, string[]> = {
     ugc_story: ["Cerita kecil, tapi relate. 😅", "Ini kejadian receh… tapi ngena.", "Kadang yang simpel itu paling nempel."],
     kesehatan: ["Kebiasaan kecil, efeknya kerasa. 💧", "Nggak harus perfect, yang penting konsisten.", "Reminder halus buat hari ini."],
-    colab_lucu: ["Duo chaos lagi beraksi… 😂", "Normalnya sebentar, chaosnya lama.", "Yang satu serius, yang satu random."],
+    colab_lucu: ["Duo chaos nonverbal lagi beraksi… 😂", "Normalnya sebentar, chaosnya lama.", "Yang satu ngomong, yang satu cuma… paham. 🤣"],
   };
 
   const tagPool: Record<NicheKey, string[]> = {
@@ -383,25 +406,20 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    // enforce preset on niche switch
     if (enforcedPreset !== preset) setPreset(enforcedPreset);
 
-    // set default prompt utama if empty/short
     setPromptUtama((prev) =>
       prev.trim().length > 10 ? prev : defaultPromptUtama(niche, enforcePreset(niche, preset))
     );
 
-    // refresh caption/tags
     const ch = generateCaptionAndHashtags(niche, enforcePreset(niche, preset));
     setCaption(ch.caption);
     setHashtags(ch.hashtags);
 
-    // clear autoBlock when switching niche for cleanliness
     setAutoBlock("");
   }, [niche]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    // enforce preset if user tries invalid
     if (preset !== enforcedPreset) setPreset(enforcedPreset);
   }, [enforcedPreset]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -419,7 +437,8 @@ ${extra.trim() || "-"}
 OUTPUT RULES:
 - One coherent ~20s video, 2 scenes merged (0–10s and 10–20s).
 - Keep continuity of location/outfit/characters between scenes.
-- No conflicting main gags: keep one core conflict thread.
+- Keep one core conflict thread (no conflicting main gags).
+- Sweepy NEVER speaks human language; nonverbal only.
 - Vertical 9:16, UGC natural feel, authentic reactions.
 `);
     setFinalPrompt(merged);
@@ -536,10 +555,9 @@ OUTPUT RULES:
         <header className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-2xl md:text-3xl font-semibold">Sora Lite — Colab Focus</h1>
+              <h1 className="text-2xl md:text-3xl font-semibold">Sora Lite — Colab Focus (Nonverbal Sweepy)</h1>
               <p className="text-sm text-blue-300/60 mt-1">
-                Fokus konflik lucu & absurd antara <b className="text-blue-200">@hanz26</b> dan{" "}
-                <b className="text-blue-200">Sweepy (@mockey.mo)</b>, plus niche UGC story & kesehatan.
+                Sweepy (@mockey.mo) <b className="text-blue-200">tidak berbicara seperti manusia</b>. Dia paham @hanz26 dan merespon nonverbal.
               </p>
             </div>
 
@@ -716,7 +734,7 @@ OUTPUT RULES:
               </div>
 
               <textarea
-                className={`${textarea} min-h-[240px]`}
+                className={`${textarea} min-h-[260px]`}
                 value={promptUtama}
                 onChange={(e) => setPromptUtama(e.target.value)}
                 placeholder="Tulis arahan sutradara: durasi, 2 scene, hook, dialog, ending..."
@@ -724,8 +742,8 @@ OUTPUT RULES:
 
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className={pill}>Hook 0–2 detik</span>
-                <span className={pill}>Konflik naik di scene 1</span>
-                <span className={pill}>Payoff punchline di scene 2</span>
+                <span className={pill}>Sweepy nonverbal</span>
+                <span className={pill}>Punchline scene 2</span>
                 <span className={pill}>Cut tepat saat lucu</span>
               </div>
             </section>
@@ -856,7 +874,7 @@ OUTPUT RULES:
         </div>
 
         <footer className="text-xs text-blue-300/60 pt-2">
-          Fokus colab: klik Auto Generate berkali-kali sampai dapat konflik yang paling lucu. Prompt Utama tetap clean untuk menjaga output video konsisten.
+          Fokus colab nonverbal: @hanz26 yang ngomong, Sweepy paham dan merespon dengan gesture/suara monyet kecil. Lebih natural & believable.
         </footer>
       </div>
     </div>
