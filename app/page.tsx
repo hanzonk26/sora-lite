@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * Sora Lite — STRICT LOCKED CAST + Min Choi Modular Preset (FULL REPLACE)
+ * Sora Lite — STRICT LOCKED CAST + Min Choi Modular Preset (FULL REPLACE, CLEAN OUTPUT)
  *
  * LOCK RULES (as requested):
  * - Preset @hanzonk26 => ONLY Niche Personal (@hanzonk26)
@@ -13,6 +13,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
  * Min Choi detail presets:
  * - ACTIVE for @hanzonk26 (Personal niches) + Colab (@hanz26 × Sweepy)
  * - DISABLED for Sweepy solo (standard only, as before)
+ *
+ * Output is now COMPACT (lebih rapi & tidak ramai),
+ * and Saved/History JSON will store the cleaned finalPrompt.
  */
 
 type NicheKey =
@@ -34,7 +37,7 @@ type SavedPrompt = {
   promptUtama: string;
   autoBlock: string;
   extra: string;
-  finalPrompt: string;
+  finalPrompt: string; // <- will be compact/clean
   caption: string;
   hashtags: string[];
   createdAt: number;
@@ -106,7 +109,7 @@ function token() {
 function enforcedPreset(niche: NicheKey): PresetKey {
   if (niche.startsWith("personal_")) return "hanzonk26";
   if (niche === "sweepy_daily") return "mockey";
-  return "hanz26"; // colab niche uses @hanz26 (and Sweepy appears as partner in prompt rules)
+  return "hanz26";
 }
 
 function allowedLocationModes(niche: NicheKey): LocationMode[] {
@@ -187,41 +190,23 @@ Kamera: ${cam}.`;
   if (niche === "personal_daily") {
     return clampText(`${base}
 Cast: @hanzonk26 (human).
-
-SCENE 1 (0–10 detik):
-Situasi normal + konflik kecil muncul cepat (0–2 detik).
-
-SCENE 2 (10–20 detik):
-Konflik naik tapi masih believable.
-Ending punchline (1 kalimat / visual) lalu cut pas lucu.`);
+SCENE 1 (0–10 detik): Situasi normal + konflik kecil muncul cepat (0–2 detik).
+SCENE 2 (10–20 detik): Konflik naik tapi masih believable. Ending punchline lalu cut pas lucu.`);
   }
 
   if (niche === "personal_health") {
     return clampText(`${base}
 Cast: @hanzonk26 (human).
-
-KESEHATAN (NON-MEDICAL):
-- Jangan klaim “menyembuhkan/pasti”.
-- 1 kebiasaan kecil yang gampang dicoba.
-
-SCENE 1:
-Hook masalah umum.
-
-SCENE 2:
-1–2 langkah praktis + contoh real.
-Closing: “kalau ada kondisi khusus, konsultasi profesional.”`);
+KESEHATAN (NON-MEDICAL): Jangan klaim “menyembuhkan/pasti”. 1 kebiasaan kecil yang gampang dicoba.
+SCENE 1: Hook masalah umum.
+SCENE 2: 1–2 langkah praktis + contoh real. Closing: “kalau ada kondisi khusus, konsultasi profesional.”`);
   }
 
   if (niche === "personal_story") {
     return clampText(`${base}
 Cast: @hanzonk26 (human).
-
-STORY TELLING:
-SCENE 1:
-Cerita first-person singkat (detail spesifik biar terasa nyata).
-
-SCENE 2:
-Twist/pelajaran ringan, tutup 1 kalimat nempel + ekspresi natural.`);
+SCENE 1: Cerita first-person singkat (detail spesifik biar terasa nyata).
+SCENE 2: Twist/pelajaran ringan, tutup 1 kalimat nempel + ekspresi natural.`);
   }
 
   if (niche === "sweepy_daily") {
@@ -229,26 +214,15 @@ Twist/pelajaran ringan, tutup 1 kalimat nempel + ekspresi natural.`);
 Cast: @mockey.mo (Sweepy) solo (nonverbal).
 ${sweepyRule()}
 Catatan: boleh ada suara off-camera manusia untuk konteks (tanpa dialog Sweepy).
-
-SCENE 1:
-Sweepy melakukan aksi harian yang terlihat “pintar” tapi lucu (hook cepat).
-
-SCENE 2:
-Aksi makin absurd, punchline visual, cut tepat saat lucu.`);
+SCENE 1: Sweepy melakukan aksi harian yang terlihat “pintar” tapi lucu (hook cepat).
+SCENE 2: Aksi makin absurd, punchline visual, cut tepat saat lucu.`);
   }
 
-  // colab
   return clampText(`${base}
 Cast: @hanz26 (human) + @mockey.mo (Sweepy) nonverbal.
 ${sweepyRule()}
-
-SCENE 1:
-Hook konflik kecil (0–2s). @hanz26 ngomong 1–2 kalimat singkat.
-Sweepy respon nonverbal.
-
-SCENE 2:
-Konflik makin absurd tapi believable.
-Ending punchline + cut tepat saat lucu.`);
+SCENE 1: Hook konflik kecil (0–2s). @hanz26 ngomong 1–2 kalimat singkat. Sweepy respon nonverbal.
+SCENE 2: Konflik makin absurd tapi believable. Ending punchline + cut tepat saat lucu.`);
 }
 
 /** ---------------- Auto generators (STRICT: no Sweepy in Personal) ---------------- */
@@ -441,61 +415,60 @@ type MinChoiItem = { id: string; label: string; text: string };
 
 const MINCHOI_PRESETS: Record<MinChoiGroup, MinChoiItem[]> = {
   hair: [
-    { id: "fade_clean", label: "Short clean fade", text: "Hair: short clean fade, realistic hair texture, subtle natural hair movement." },
-    { id: "messy_texture", label: "Messy textured", text: "Hair: messy textured, natural strands, realistic volume, subtle motion." },
-    { id: "wavy_medium", label: "Medium wavy", text: "Hair: medium wavy hair, soft natural movement, realistic shine." },
-    { id: "slick_back", label: "Slick back modern", text: "Hair: modern slick back style, clean silhouette, realistic texture." },
-    { id: "cap_covered", label: "Cap / covered", text: "Hair: mostly covered by cap/hoodie, minimal hair visible, natural look." },
+    { id: "fade_clean", label: "Short clean fade", text: "Hair: short clean fade." },
+    { id: "messy_texture", label: "Messy textured", text: "Hair: messy textured." },
+    { id: "wavy_medium", label: "Medium wavy", text: "Hair: medium wavy." },
+    { id: "slick_back", label: "Slick back modern", text: "Hair: modern slick back." },
+    { id: "cap_covered", label: "Cap / covered", text: "Hair: mostly covered by cap/hoodie." },
   ],
   outfit: [
-    { id: "streetwear", label: "Casual streetwear", text: "Outfit: casual streetwear, layered tee/jacket, realistic fabric folds and stitching." },
-    { id: "smart_casual", label: "Smart casual", text: "Outfit: smart casual (shirt + neat outer), clean fit, premium textile texture." },
-    { id: "techwear", label: "Minimalist techwear", text: "Outfit: minimalist techwear, matte materials, functional silhouette, realistic seams." },
-    { id: "sporty", label: "Sporty activewear", text: "Outfit: sporty activewear, breathable fabric texture, natural stretch and movement." },
-    { id: "formal_modern", label: "Formal modern", text: "Outfit: modern formal, tailored fit, realistic cloth drape and highlights." },
+    { id: "streetwear", label: "Casual streetwear", text: "Outfit: casual streetwear, realistic fabric folds." },
+    { id: "smart_casual", label: "Smart casual", text: "Outfit: smart casual, clean fit." },
+    { id: "techwear", label: "Minimalist techwear", text: "Outfit: minimalist techwear, matte materials." },
+    { id: "sporty", label: "Sporty activewear", text: "Outfit: sporty activewear, natural movement." },
+    { id: "formal_modern", label: "Formal modern", text: "Outfit: modern formal, tailored fit." },
   ],
   location: [
-    { id: "room_minimal", label: "Indoor: modern minimal room", text: "Location: modern minimal indoor room, clean background, realistic depth and scale." },
-    { id: "cafe_aesthetic", label: "Indoor: cafe aesthetic", text: "Location: modern aesthetic cafe, warm details, subtle background activity, realistic bokeh." },
-    { id: "studio_creator", label: "Indoor: creator studio", text: "Location: creator studio setup, soft practical lights, tidy props, realistic environment." },
-    { id: "street_urban", label: "Outdoor: urban street", text: "Location: urban street, concrete + city textures, natural passersby blur, believable scale." },
-    { id: "rooftop_city", label: "Outdoor: rooftop city view", text: "Location: rooftop with city skyline, realistic perspective and depth." },
-    { id: "night_neon", label: "Outdoor: night neon", text: "Location: night city with neon signage, wet reflections, realistic glow and contrast." },
+    { id: "room_minimal", label: "Indoor: modern minimal room", text: "Scene: modern minimal room." },
+    { id: "cafe_aesthetic", label: "Indoor: cafe aesthetic", text: "Scene: modern aesthetic cafe." },
+    { id: "studio_creator", label: "Indoor: creator studio", text: "Scene: creator studio setup." },
+    { id: "street_urban", label: "Outdoor: urban street", text: "Scene: urban street." },
+    { id: "rooftop_city", label: "Outdoor: rooftop city view", text: "Scene: rooftop city view." },
+    { id: "night_neon", label: "Outdoor: night neon", text: "Scene: night neon city, wet reflections." },
   ],
   action: [
-    { id: "talk_camera", label: "Talk: casual to camera", text: "Action: talking casually to camera, natural facial expressions, subtle hand gestures, non-posed." },
-    { id: "walk_confident", label: "Walk: slow confident", text: "Action: slow confident walking, relaxed shoulders, natural gait, believable motion." },
-    { id: "sit_relaxed", label: "Sit: relaxed", text: "Action: sitting relaxed, realistic micro-expressions, natural posture." },
-    { id: "show_product", label: "Show: demonstrate item", text: "Action: demonstrating an item naturally, close-up moments, realistic grip and hand motion." },
-    { id: "react_funny", label: "React: subtle comedic", text: "Action: subtle comedic reaction (small pause, side glance, smirk), timing feels natural." },
+    { id: "talk_camera", label: "Talk: casual to camera", text: "Action: talk casually to camera, natural expression." },
+    { id: "walk_confident", label: "Walk: slow confident", text: "Action: slow confident walk, natural gait." },
+    { id: "sit_relaxed", label: "Sit: relaxed", text: "Action: sit relaxed, subtle micro-expressions." },
+    { id: "show_product", label: "Show: demonstrate item", text: "Action: demonstrate item naturally, quick close-ups." },
+    { id: "react_funny", label: "React: subtle comedic", text: "Action: subtle comedic reaction, natural timing." },
   ],
   lighting: [
-    { id: "soft_daylight", label: "Soft daylight", text: "Lighting: soft natural daylight, balanced highlights and shadows, realistic light direction." },
-    { id: "window_side", label: "Window side light", text: "Lighting: window side lighting, gentle falloff, cinematic contrast, natural skin tones." },
-    { id: "golden_hour", label: "Golden hour", text: "Lighting: golden hour sunlight, warm highlights, soft shadows, cinematic glow." },
-    { id: "indoor_softbox", label: "Indoor cinematic soft", text: "Lighting: indoor cinematic soft lighting (softbox feel), clean exposure, premium look." },
-    { id: "night_ambient", label: "Night ambient", text: "Lighting: night ambient practical lights, realistic reflections, controlled contrast." },
+    { id: "soft_daylight", label: "Soft daylight", text: "Lighting: soft daylight, balanced shadows." },
+    { id: "window_side", label: "Window side light", text: "Lighting: window side light, cinematic falloff." },
+    { id: "golden_hour", label: "Golden hour", text: "Lighting: golden hour glow, warm highlights." },
+    { id: "indoor_softbox", label: "Indoor cinematic soft", text: "Lighting: indoor soft light, clean exposure." },
+    { id: "night_ambient", label: "Night ambient", text: "Lighting: night ambient practical lights." },
   ],
   camera: [
-    { id: "35mm_cine", label: "Lens: 35mm cinematic", text: "Camera: shot on 35mm lens, shallow depth of field, smooth cinematic movement, professional stabilization." },
-    { id: "50mm_portrait", label: "Lens: 50mm portrait", text: "Camera: shot on 50mm lens, creamy bokeh, steady framing, premium portrait feel." },
-    { id: "iphone_ugc", label: "iPhone-style UGC", text: "Camera: iPhone-style cinematic UGC, natural handheld but stabilized, realistic exposure." },
-    { id: "tripod_clean", label: "Tripod clean", text: "Camera: static tripod shot, clean framing, minimal shake, crisp focus." },
-    { id: "handheld_smooth", label: "Handheld smooth", text: "Camera: smooth handheld camera, subtle natural motion, cinematic pacing, no jitter." },
+    { id: "35mm_cine", label: "Lens: 35mm cinematic", text: "Camera: 35mm, shallow DOF, smooth movement." },
+    { id: "50mm_portrait", label: "Lens: 50mm portrait", text: "Camera: 50mm, creamy bokeh, steady framing." },
+    { id: "iphone_ugc", label: "iPhone-style UGC", text: "Camera: iPhone-style UGC, handheld but stabilized." },
+    { id: "tripod_clean", label: "Tripod clean", text: "Camera: tripod static, clean framing." },
+    { id: "handheld_smooth", label: "Handheld smooth", text: "Camera: smooth handheld, subtle motion." },
   ],
   mood: [
-    { id: "clean_premium", label: "Clean & premium", text: "Mood: clean and premium, professional cinematic color grading, high detail, looks like real footage." },
-    { id: "warm_friendly", label: "Warm & friendly", text: "Mood: warm and friendly, natural tones, realistic skin texture, looks authentic." },
-    { id: "dramatic_cine", label: "Dramatic cinematic", text: "Mood: dramatic cinematic tone, controlled contrast, film-like grading, realistic textures." },
-    { id: "calm_minimal", label: "Calm & minimal", text: "Mood: calm minimal vibe, uncluttered composition, gentle grading, premium realism." },
-    { id: "fun_comedy", label: "Fun comedic", text: "Mood: fun comedic timing, subtle punchline pacing, still realistic and cinematic." },
+    { id: "clean_premium", label: "Clean & premium", text: "Mood: clean & premium, pro color grading." },
+    { id: "warm_friendly", label: "Warm & friendly", text: "Mood: warm & friendly, natural tones." },
+    { id: "dramatic_cine", label: "Dramatic cinematic", text: "Mood: dramatic cinematic, controlled contrast." },
+    { id: "calm_minimal", label: "Calm & minimal", text: "Mood: calm minimal, uncluttered composition." },
+    { id: "fun_comedy", label: "Fun comedic", text: "Mood: fun comedic, punchy timing." },
   ],
   qualityLock: [
     {
       id: "minchoi_lock",
       label: "Min Choi Quality Lock",
-      text:
-        "Ultra-realistic, natural movement, realistic textures, no distortion, no deformed hands, no uncanny face. Professional cinematic color grading. Looks like real footage, not AI generated.",
+      text: "Quality: ultra-realistic, natural movement, looks like real footage (no distortion).",
     },
   ],
 };
@@ -521,7 +494,6 @@ const MINCHOI_DEFAULT_BY_PRESET: Partial<Record<PresetKey, Record<MinChoiGroup, 
     mood: "fun_comedy",
     qualityLock: "minchoi_lock",
   },
-  // Sweepy solo = standard => no MinChoi defaults
 };
 
 const MINCHOI_ORDER: MinChoiGroup[] = [
@@ -550,6 +522,75 @@ function buildMinChoiExtra(sel: Partial<Record<MinChoiGroup, string>>) {
   return clampText(lines.join("\n"));
 }
 
+/** ---------------- Output Cleaner (COMPACT FINAL PROMPT) ---------------- */
+
+function compressAutoBlock(s: string) {
+  const lines = s
+    .split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .filter((l) => !l.toLowerCase().includes("uniqueness token"))
+    .filter((l) => !l.toLowerCase().startsWith("auto block ("))
+    .filter((l) => !l.toLowerCase().startsWith("cast:"))
+    .filter((l) => !l.toLowerCase().startsWith("format:"))
+    .filter((l) => !l.toLowerCase().startsWith("camera:"))
+    .filter((l) => !l.toLowerCase().startsWith("location:"))
+    .filter((l) => !l.toLowerCase().startsWith("audio:"));
+
+  const keys = ["Base:", "Conflict:", "Topic:", "Theme:", "Punchline:", "Timing:"];
+  const picked = lines.filter((l) => keys.some((k) => l.startsWith(k)));
+  return clampText((picked.length ? picked : lines.slice(0, 6)).join("\n"));
+}
+
+function compressPromptUtama(s: string) {
+  const lines = s
+    .split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+  // Keep high signal lines
+  const keepStarts = ["Hook", "Ending", "Lokasi:", "Kamera:"];
+  const important = lines.filter((l) =>
+    keepStarts.some((k) => l.toLowerCase().startsWith(k.toLowerCase()))
+  );
+
+  // Also keep short scene summary lines if exist
+  const sceneSummary = lines
+    .filter((l) => l.toLowerCase().includes("scene") || l.toLowerCase().includes("konflik") || l.toLowerCase().includes("hook"))
+    .slice(0, 4);
+
+  const merged = clampText([...important, ...sceneSummary].join("\n"));
+  return merged || clampText(lines.slice(0, 6).join("\n"));
+}
+
+function combineExtra(minChoiExtra: string, extraManual: string) {
+  const combined = clampText([minChoiExtra, extraManual].filter(Boolean).join("\n"));
+  // If empty
+  if (!combined) return "-";
+  // Make it compact: max ~8 lines
+  const lines = combined
+    .split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  return clampText(lines.slice(0, 8).join("\n"));
+}
+
+function compactRules(niche: NicheKey) {
+  const isPersonal = niche.startsWith("personal_");
+  const isSweepy = niche === "sweepy_daily";
+  const isColab = niche === "colab";
+
+  const lines: string[] = [];
+  if (isPersonal) lines.push("Cast: ONLY @hanzonk26.");
+  if (isSweepy) lines.push("Cast: ONLY Sweepy (@mockey.mo) — nonverbal.");
+  if (isColab) lines.push("Cast: @hanz26 + Sweepy (@mockey.mo) — Sweepy nonverbal.");
+
+  if (isSweepy || isColab) lines.push("Sweepy rule: nonverbal only (no human speech).");
+  lines.push("Format: vertical 9:16 • ~20s • 2 scenes merged • continuity ON.");
+
+  return clampText(lines.join("\n"));
+}
+
 /** ---------------- UI ---------------- */
 
 export default function Page() {
@@ -561,7 +602,6 @@ export default function Page() {
   const [autoBlock, setAutoBlock] = useState("");
   const [extra, setExtra] = useState("");
 
-  // Min Choi selections (only for hanzonk26 + colab/hanz26)
   const [minChoiSel, setMinChoiSel] = useState<Partial<Record<MinChoiGroup, string>>>({});
 
   const [finalPrompt, setFinalPrompt] = useState("");
@@ -614,31 +654,27 @@ export default function Page() {
   }, [niche]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const combinedExtra = clampText([minChoiExtra, extra].filter(Boolean).join("\n\n"));
+    const shortPrompt = compressPromptUtama(promptUtama);
+    const shortAuto = autoBlock.trim() ? compressAutoBlock(autoBlock) : "(Klik Auto Generate)";
+    const shortExtra = combineExtra(minChoiExtra, extra);
+    const rules = compactRules(niche);
+
+    const header = `${PRESET_LABEL[lockedPreset]} • ${NICHE_LABEL[niche]} • ${LOCATION_LABEL[lockedMode]}`;
 
     const merged = clampText(`
-PRESET (LOCKED): ${PRESET_LABEL[lockedPreset]}
-NICHE: ${NICHE_LABEL[niche]}
-LOCATION MODE: ${LOCATION_LABEL[lockedMode]}
+${header}
 
-PROMPT UTAMA (MANUAL):
-${promptUtama.trim() || "(Isi Prompt Utama dulu)"}
+PROMPT:
+${shortPrompt || "(Isi Prompt Utama dulu)"}
 
-AUTO BLOCK (FRESH):
-${autoBlock.trim() || "(Klik Auto Generate)"}
+AUTO:
+${shortAuto}
 
-EXTRA (OPTIONAL):
-${combinedExtra || "-"}
+EXTRA:
+${shortExtra}
 
-OUTPUT RULES:
-- One coherent ~20s video, 2 scenes merged (0–10s and 10–20s).
-- Keep continuity of location/outfit/characters between scenes.
-- STRICT CAST LOCK:
-  - Personal niche => ONLY @hanzonk26 (NO Sweepy).
-  - Sweepy niche   => ONLY @mockey.mo (nonverbal).
-  - Colab niche    => @hanz26 + @mockey.mo (Sweepy nonverbal).
-- Sweepy NEVER speaks human language; nonverbal only.
-- Vertical 9:16, UGC natural feel.
+RULES:
+${rules}
 `);
     setFinalPrompt(merged);
   }, [promptUtama, autoBlock, extra, minChoiExtra, niche, lockedMode, lockedPreset]);
@@ -698,7 +734,7 @@ OUTPUT RULES:
       promptUtama,
       autoBlock,
       extra,
-      finalPrompt,
+      finalPrompt, // <- compact cleaned prompt
       caption: ch.caption,
       hashtags: ch.hashtags,
       createdAt: Date.now(),
@@ -752,7 +788,7 @@ OUTPUT RULES:
           <div className="flex items-start justify-between gap-3">
             <div>
               <h1 className="text-2xl md:text-3xl font-semibold">
-                Sora Lite — Strict Locked Cast <span className="text-blue-300/60">+ Min Choi Detail</span>
+                Sora Lite — Locked Cast <span className="text-blue-300/60">(Clean Output)</span>
               </h1>
               <p className="text-sm text-blue-300/60 mt-1">
                 Personal=@hanzonk26 • Sweepy=@mockey.mo • Colab=@hanz26 + Sweepy (nonverbal)
@@ -763,7 +799,7 @@ OUTPUT RULES:
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
                 Cast Locked
               </span>
-              <span className="text-xs text-blue-300/60">20 detik • 2 scene • 1 video utuh</span>
+              <span className="text-xs text-blue-300/60">~20 detik • 2 scene • 1 video utuh</span>
             </div>
           </div>
 
@@ -798,11 +834,7 @@ OUTPUT RULES:
             </div>
             <div className="flex flex-wrap gap-2">
               {(Object.keys(NICHE_LABEL) as NicheKey[]).map((k) => (
-                <button
-                  key={k}
-                  className={k === niche ? btnPrimary : btnGhost}
-                  onClick={() => setNiche(k)}
-                >
+                <button key={k} className={k === niche ? btnPrimary : btnGhost} onClick={() => setNiche(k)}>
                   {NICHE_LABEL[k].split(" — ")[0]}
                 </button>
               ))}
@@ -844,11 +876,7 @@ OUTPUT RULES:
               <div className={cardTitle}>Location Mode</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {allowedModes.map((m) => (
-                  <button
-                    key={m}
-                    className={m === lockedMode ? btnPrimary : btnGhost}
-                    onClick={() => setLocationMode(m)}
-                  >
+                  <button key={m} className={m === lockedMode ? btnPrimary : btnGhost} onClick={() => setLocationMode(m)}>
                     {LOCATION_LABEL[m]}
                   </button>
                 ))}
@@ -865,13 +893,9 @@ OUTPUT RULES:
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className={cardTitle}>Prompt Utama (Manual)</div>
-              <div className={subText}>Template auto akan muncul kalau masih kosong</div>
+              <div className={subText}>Template auto muncul kalau masih kosong</div>
             </div>
-            <button
-              className={btn}
-              onClick={() => setPromptUtama(defaultPromptUtama(niche, lockedMode))}
-              title="Reset template prompt utama"
-            >
+            <button className={btn} onClick={() => setPromptUtama(defaultPromptUtama(niche, lockedMode))}>
               Reset Template
             </button>
           </div>
@@ -880,7 +904,7 @@ OUTPUT RULES:
             className={textarea}
             value={promptUtama}
             onChange={(e) => setPromptUtama(e.target.value)}
-            rows={10}
+            rows={8}
             placeholder="Tulis prompt utama kamu di sini…"
           />
         </section>
@@ -890,7 +914,7 @@ OUTPUT RULES:
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className={cardTitle}>Auto Block (Fresh)</div>
-              <div className={subText}>Klik untuk random, tapi tetap patuh lock rules</div>
+              <div className={subText}>Random cepat, tetap patuh lock rules</div>
             </div>
             <div className="flex gap-2">
               <button className={btnPrimary} onClick={doAutoGenerate}>
@@ -910,9 +934,7 @@ OUTPUT RULES:
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className={cardTitle}>Extra (Optional)</div>
-              <div className={subText}>
-                Min Choi detail aktif untuk @hanzonk26 & Colab. Sweepy solo tetap standar.
-              </div>
+              <div className={subText}>Min Choi detail aktif untuk @hanzonk26 & Colab. Sweepy solo standar.</div>
             </div>
             <button className={btn} onClick={() => setExtra("")}>
               Clear Extra Manual
@@ -923,9 +945,6 @@ OUTPUT RULES:
           {isMinChoi && (
             <div className="mt-3 rounded-xl border border-blue-900/40 bg-blue-950/25 p-3">
               <div className="text-xs text-blue-200 font-semibold">Min Choi Detail Preset</div>
-              <div className="text-xs text-blue-300/70 mt-1">
-                Aktif untuk <b>@hanzonk26</b> & <b>Colab (@hanz26 × Sweepy)</b>. Sweepy solo tetap standar.
-              </div>
 
               <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                 {MINCHOI_ORDER.map((group) => (
@@ -956,19 +975,10 @@ OUTPUT RULES:
                 <div className="text-xs text-blue-200 font-semibold">Extra (auto)</div>
                 <pre className={smallPre}>{minChoiExtra || "(pilih preset di atas)"}</pre>
                 <div className="mt-2 flex gap-2 flex-wrap">
-                  <button
-                    className={btn}
-                    onClick={() => copyText(minChoiExtra)}
-                    disabled={!minChoiExtra.trim()}
-                    title="Copy Extra auto Min Choi"
-                  >
+                  <button className={btn} onClick={() => copyText(minChoiExtra)} disabled={!minChoiExtra.trim()}>
                     Copy Min Choi Extra
                   </button>
-                  <button
-                    className={btn}
-                    onClick={() => setMinChoiSel(MINCHOI_DEFAULT_BY_PRESET[lockedPreset] || {})}
-                    title="Reset Min Choi defaults"
-                  >
+                  <button className={btn} onClick={() => setMinChoiSel(MINCHOI_DEFAULT_BY_PRESET[lockedPreset] || {})}>
                     Reset Min Choi Defaults
                   </button>
                 </div>
@@ -976,13 +986,12 @@ OUTPUT RULES:
             </div>
           )}
 
-          {/* Manual extra stays available for all */}
           <textarea
             className={textarea}
             value={extra}
             onChange={(e) => setExtra(e.target.value)}
-            rows={6}
-            placeholder="Tambahan manual (opsional). Misal: tone suara, pacing, overlay text, aturan khusus…"
+            rows={5}
+            placeholder="Tambahan manual (opsional). Misal: overlay text, pacing, aturan khusus…"
           />
         </section>
 
@@ -990,14 +999,14 @@ OUTPUT RULES:
         <section className={card}>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <div className={cardTitle}>Final Prompt (Copy ke Sora)</div>
-              <div className={subText}>Sudah gabung: Prompt Utama + Auto Block + Extra</div>
+              <div className={cardTitle}>Final Prompt (Clean)</div>
+              <div className={subText}>Sudah diringkas: copy lebih enak & gak ramai</div>
             </div>
             <div className="flex gap-2 flex-wrap">
               <button className={btnPrimary} disabled={!canCopyFinal} onClick={() => copyText(finalPrompt)}>
                 Copy Final Prompt
               </button>
-              <button className={btn} onClick={doSave} title="Simpan ke Saved">
+              <button className={btn} onClick={doSave}>
                 Save
               </button>
             </div>
@@ -1011,7 +1020,7 @@ OUTPUT RULES:
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className={cardTitle}>Caption + Hashtags</div>
-              <div className={subText}>Auto sesuai niche (bisa copy cepat)</div>
+              <div className={subText}>Auto sesuai niche</div>
             </div>
             <div className="flex gap-2 flex-wrap">
               <button className={btn} onClick={() => copyText(caption)}>
@@ -1042,7 +1051,7 @@ OUTPUT RULES:
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <div className={cardTitle}>Saved</div>
-                <div className={subText}>Tersimpan di localStorage</div>
+                <div className={subText}>JSON akan menyimpan finalPrompt yang sudah dirapihkan</div>
               </div>
               <button className={btn} onClick={() => copyText(JSON.stringify(saved, null, 2))} disabled={saved.length === 0}>
                 Copy JSON Saved
@@ -1094,7 +1103,7 @@ OUTPUT RULES:
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <div className={cardTitle}>History (Auto Generate)</div>
-                <div className={subText}>Hanya potongan Auto Block</div>
+                <div className={subText}>Hanya potongan Auto Block (raw)</div>
               </div>
               <div className="flex gap-2 flex-wrap">
                 <button className={btn} onClick={clearHistory} disabled={history.length === 0}>
@@ -1120,12 +1129,7 @@ OUTPUT RULES:
                       <button className={btnPrimary} onClick={() => copyText(h.autoBlock)}>
                         Copy Auto
                       </button>
-                      <button
-                        className={btn}
-                        onClick={() => {
-                          setAutoBlock(h.autoBlock);
-                        }}
-                      >
+                      <button className={btn} onClick={() => setAutoBlock(h.autoBlock)}>
                         Load to Auto Block
                       </button>
                     </div>
@@ -1137,7 +1141,7 @@ OUTPUT RULES:
         </section>
 
         <footer className="py-8 text-center text-xs text-blue-300/50">
-          Sora Lite — Locked Cast v2 • Min Choi Preset ON (Personal + Colab), OFF (Sweepy)
+          Sora Lite — Locked Cast v2 • Clean Output • Min Choi ON (Personal + Colab), OFF (Sweepy)
         </footer>
       </div>
     </div>
