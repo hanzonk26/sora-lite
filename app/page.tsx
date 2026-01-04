@@ -3,17 +3,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * Sora Lite — STRICT LOCKED CAST (FULL REPLACE)
+ * Sora Lite — STRICT LOCKED CAST + Min Choi Modular Preset (FULL REPLACE)
  *
  * LOCK RULES (as requested):
  * - Preset @hanzonk26 => ONLY Niche Personal (@hanzonk26)
  * - Preset Sweepy (@mockey.mo) => ONLY Niche Sweepy
  * - Preset @hanz26 => ONLY Niche Colab (with Sweepy nonverbal)
  *
- * Niches:
- * - Personal (@hanzonk26): UGC Daily / Kesehatan / Story Telling
- * - Sweepy Only: UGC Daily Sweepy
- * - Colab (@hanz26 + @mockey.mo): Indoor / Outdoor / Nusantara Random
+ * Min Choi detail presets:
+ * - ACTIVE for @hanzonk26 (Personal niches) + Colab (@hanz26 × Sweepy)
+ * - DISABLED for Sweepy solo (standard only, as before)
  */
 
 type NicheKey =
@@ -76,11 +75,9 @@ const LOCATION_LABEL: Record<LocationMode, string> = {
 function uid(prefix = "id") {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 }
-
 function pick<T>(arr: T[]) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
-
 function shuffle<T>(arr: T[]) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -89,11 +86,9 @@ function shuffle<T>(arr: T[]) {
   }
   return a;
 }
-
 function clampText(s: string) {
   return s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
-
 function safeParse<T>(raw: string | null, fallback: T): T {
   if (!raw) return fallback;
   try {
@@ -102,7 +97,6 @@ function safeParse<T>(raw: string | null, fallback: T): T {
     return fallback;
   }
 }
-
 function token() {
   return Math.random().toString(36).slice(2, 8);
 }
@@ -431,6 +425,131 @@ function captionTags(niche: NicheKey) {
   };
 }
 
+/** ---------------- Min Choi Preset Pack (ONLY for hanzonk26 + colab/hanz26) ---------------- */
+
+type MinChoiGroup =
+  | "hair"
+  | "outfit"
+  | "location"
+  | "action"
+  | "lighting"
+  | "camera"
+  | "mood"
+  | "qualityLock";
+
+type MinChoiItem = { id: string; label: string; text: string };
+
+const MINCHOI_PRESETS: Record<MinChoiGroup, MinChoiItem[]> = {
+  hair: [
+    { id: "fade_clean", label: "Short clean fade", text: "Hair: short clean fade, realistic hair texture, subtle natural hair movement." },
+    { id: "messy_texture", label: "Messy textured", text: "Hair: messy textured, natural strands, realistic volume, subtle motion." },
+    { id: "wavy_medium", label: "Medium wavy", text: "Hair: medium wavy hair, soft natural movement, realistic shine." },
+    { id: "slick_back", label: "Slick back modern", text: "Hair: modern slick back style, clean silhouette, realistic texture." },
+    { id: "cap_covered", label: "Cap / covered", text: "Hair: mostly covered by cap/hoodie, minimal hair visible, natural look." },
+  ],
+  outfit: [
+    { id: "streetwear", label: "Casual streetwear", text: "Outfit: casual streetwear, layered tee/jacket, realistic fabric folds and stitching." },
+    { id: "smart_casual", label: "Smart casual", text: "Outfit: smart casual (shirt + neat outer), clean fit, premium textile texture." },
+    { id: "techwear", label: "Minimalist techwear", text: "Outfit: minimalist techwear, matte materials, functional silhouette, realistic seams." },
+    { id: "sporty", label: "Sporty activewear", text: "Outfit: sporty activewear, breathable fabric texture, natural stretch and movement." },
+    { id: "formal_modern", label: "Formal modern", text: "Outfit: modern formal, tailored fit, realistic cloth drape and highlights." },
+  ],
+  location: [
+    { id: "room_minimal", label: "Indoor: modern minimal room", text: "Location: modern minimal indoor room, clean background, realistic depth and scale." },
+    { id: "cafe_aesthetic", label: "Indoor: cafe aesthetic", text: "Location: modern aesthetic cafe, warm details, subtle background activity, realistic bokeh." },
+    { id: "studio_creator", label: "Indoor: creator studio", text: "Location: creator studio setup, soft practical lights, tidy props, realistic environment." },
+    { id: "street_urban", label: "Outdoor: urban street", text: "Location: urban street, concrete + city textures, natural passersby blur, believable scale." },
+    { id: "rooftop_city", label: "Outdoor: rooftop city view", text: "Location: rooftop with city skyline, realistic perspective and depth." },
+    { id: "night_neon", label: "Outdoor: night neon", text: "Location: night city with neon signage, wet reflections, realistic glow and contrast." },
+  ],
+  action: [
+    { id: "talk_camera", label: "Talk: casual to camera", text: "Action: talking casually to camera, natural facial expressions, subtle hand gestures, non-posed." },
+    { id: "walk_confident", label: "Walk: slow confident", text: "Action: slow confident walking, relaxed shoulders, natural gait, believable motion." },
+    { id: "sit_relaxed", label: "Sit: relaxed", text: "Action: sitting relaxed, realistic micro-expressions, natural posture." },
+    { id: "show_product", label: "Show: demonstrate item", text: "Action: demonstrating an item naturally, close-up moments, realistic grip and hand motion." },
+    { id: "react_funny", label: "React: subtle comedic", text: "Action: subtle comedic reaction (small pause, side glance, smirk), timing feels natural." },
+  ],
+  lighting: [
+    { id: "soft_daylight", label: "Soft daylight", text: "Lighting: soft natural daylight, balanced highlights and shadows, realistic light direction." },
+    { id: "window_side", label: "Window side light", text: "Lighting: window side lighting, gentle falloff, cinematic contrast, natural skin tones." },
+    { id: "golden_hour", label: "Golden hour", text: "Lighting: golden hour sunlight, warm highlights, soft shadows, cinematic glow." },
+    { id: "indoor_softbox", label: "Indoor cinematic soft", text: "Lighting: indoor cinematic soft lighting (softbox feel), clean exposure, premium look." },
+    { id: "night_ambient", label: "Night ambient", text: "Lighting: night ambient practical lights, realistic reflections, controlled contrast." },
+  ],
+  camera: [
+    { id: "35mm_cine", label: "Lens: 35mm cinematic", text: "Camera: shot on 35mm lens, shallow depth of field, smooth cinematic movement, professional stabilization." },
+    { id: "50mm_portrait", label: "Lens: 50mm portrait", text: "Camera: shot on 50mm lens, creamy bokeh, steady framing, premium portrait feel." },
+    { id: "iphone_ugc", label: "iPhone-style UGC", text: "Camera: iPhone-style cinematic UGC, natural handheld but stabilized, realistic exposure." },
+    { id: "tripod_clean", label: "Tripod clean", text: "Camera: static tripod shot, clean framing, minimal shake, crisp focus." },
+    { id: "handheld_smooth", label: "Handheld smooth", text: "Camera: smooth handheld camera, subtle natural motion, cinematic pacing, no jitter." },
+  ],
+  mood: [
+    { id: "clean_premium", label: "Clean & premium", text: "Mood: clean and premium, professional cinematic color grading, high detail, looks like real footage." },
+    { id: "warm_friendly", label: "Warm & friendly", text: "Mood: warm and friendly, natural tones, realistic skin texture, looks authentic." },
+    { id: "dramatic_cine", label: "Dramatic cinematic", text: "Mood: dramatic cinematic tone, controlled contrast, film-like grading, realistic textures." },
+    { id: "calm_minimal", label: "Calm & minimal", text: "Mood: calm minimal vibe, uncluttered composition, gentle grading, premium realism." },
+    { id: "fun_comedy", label: "Fun comedic", text: "Mood: fun comedic timing, subtle punchline pacing, still realistic and cinematic." },
+  ],
+  qualityLock: [
+    {
+      id: "minchoi_lock",
+      label: "Min Choi Quality Lock",
+      text:
+        "Ultra-realistic, natural movement, realistic textures, no distortion, no deformed hands, no uncanny face. Professional cinematic color grading. Looks like real footage, not AI generated.",
+    },
+  ],
+};
+
+const MINCHOI_DEFAULT_BY_PRESET: Partial<Record<PresetKey, Record<MinChoiGroup, string>>> = {
+  hanzonk26: {
+    hair: "fade_clean",
+    outfit: "techwear",
+    location: "studio_creator",
+    action: "talk_camera",
+    lighting: "window_side",
+    camera: "35mm_cine",
+    mood: "clean_premium",
+    qualityLock: "minchoi_lock",
+  },
+  hanz26: {
+    hair: "fade_clean",
+    outfit: "streetwear",
+    location: "cafe_aesthetic",
+    action: "react_funny",
+    lighting: "indoor_softbox",
+    camera: "35mm_cine",
+    mood: "fun_comedy",
+    qualityLock: "minchoi_lock",
+  },
+  // Sweepy solo = standard => no MinChoi defaults
+};
+
+const MINCHOI_ORDER: MinChoiGroup[] = [
+  "hair",
+  "outfit",
+  "location",
+  "action",
+  "lighting",
+  "camera",
+  "mood",
+  "qualityLock",
+];
+
+function getMinChoiText(group: MinChoiGroup, id?: string) {
+  if (!id) return "";
+  const item = MINCHOI_PRESETS[group]?.find((x) => x.id === id);
+  return item?.text?.trim() || "";
+}
+
+function buildMinChoiExtra(sel: Partial<Record<MinChoiGroup, string>>) {
+  const lines: string[] = [];
+  for (const g of MINCHOI_ORDER) {
+    const t = getMinChoiText(g, sel[g]);
+    if (t) lines.push(t);
+  }
+  return clampText(lines.join("\n"));
+}
+
 /** ---------------- UI ---------------- */
 
 export default function Page() {
@@ -441,6 +560,9 @@ export default function Page() {
   const [promptUtama, setPromptUtama] = useState("");
   const [autoBlock, setAutoBlock] = useState("");
   const [extra, setExtra] = useState("");
+
+  // Min Choi selections (only for hanzonk26 + colab/hanz26)
+  const [minChoiSel, setMinChoiSel] = useState<Partial<Record<MinChoiGroup, string>>>({});
 
   const [finalPrompt, setFinalPrompt] = useState("");
   const [caption, setCaption] = useState("");
@@ -453,6 +575,16 @@ export default function Page() {
   const lockedPreset = useMemo(() => enforcedPreset(niche), [niche]);
   const allowedModes = useMemo(() => allowedLocationModes(niche), [niche]);
   const lockedMode = useMemo(() => enforceLocationMode(niche, locationMode), [niche, locationMode]);
+
+  const isMinChoi = useMemo(
+    () => lockedPreset === "hanzonk26" || lockedPreset === "hanz26",
+    [lockedPreset]
+  );
+
+  const minChoiExtra = useMemo(() => {
+    if (!isMinChoi) return "";
+    return buildMinChoiExtra(minChoiSel);
+  }, [isMinChoi, minChoiSel]);
 
   useEffect(() => {
     setSaved(safeParse(localStorage.getItem(LS_SAVED), []));
@@ -470,10 +602,20 @@ export default function Page() {
     setCaption(ch.caption);
     setHashtags(ch.hashtags);
 
+    // init Min Choi defaults when applicable
+    const defaults = MINCHOI_DEFAULT_BY_PRESET[lockedPreset];
+    if (defaults && (lockedPreset === "hanzonk26" || lockedPreset === "hanz26")) {
+      setMinChoiSel(defaults);
+    } else {
+      setMinChoiSel({});
+    }
+
     setAutoBlock("");
   }, [niche]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    const combinedExtra = clampText([minChoiExtra, extra].filter(Boolean).join("\n\n"));
+
     const merged = clampText(`
 PRESET (LOCKED): ${PRESET_LABEL[lockedPreset]}
 NICHE: ${NICHE_LABEL[niche]}
@@ -486,7 +628,7 @@ AUTO BLOCK (FRESH):
 ${autoBlock.trim() || "(Klik Auto Generate)"}
 
 EXTRA (OPTIONAL):
-${extra.trim() || "-"}
+${combinedExtra || "-"}
 
 OUTPUT RULES:
 - One coherent ~20s video, 2 scenes merged (0–10s and 10–20s).
@@ -499,7 +641,7 @@ OUTPUT RULES:
 - Vertical 9:16, UGC natural feel.
 `);
     setFinalPrompt(merged);
-  }, [promptUtama, autoBlock, extra, niche, lockedMode, lockedPreset]);
+  }, [promptUtama, autoBlock, extra, minChoiExtra, niche, lockedMode, lockedPreset]);
 
   function persistSaved(next: SavedPrompt[]) {
     setSaved(next);
@@ -609,7 +751,9 @@ OUTPUT RULES:
         <header className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-2xl md:text-3xl font-semibold">Sora Lite — Strict Locked Cast</h1>
+              <h1 className="text-2xl md:text-3xl font-semibold">
+                Sora Lite — Strict Locked Cast <span className="text-blue-300/60">+ Min Choi Detail</span>
+              </h1>
               <p className="text-sm text-blue-300/60 mt-1">
                 Personal=@hanzonk26 • Sweepy=@mockey.mo • Colab=@hanz26 + Sweepy (nonverbal)
               </p>
@@ -631,278 +775,369 @@ OUTPUT RULES:
               Preset (locked): <b className="text-blue-100">{PRESET_LABEL[lockedPreset]}</b>
             </span>
             <span className={pill}>
-              Lokasi: <b className="text-blue-100">{LOCATION_LABEL[lockedMode]}</b>
+              Location mode: <b className="text-blue-100">{LOCATION_LABEL[lockedMode]}</b>
             </span>
+            {isMinChoi ? (
+              <span className={pill}>
+                Min Choi: <b className="text-blue-100">ON</b>
+              </span>
+            ) : (
+              <span className={pill}>
+                Min Choi: <b className="text-blue-100">OFF</b> <span className="text-blue-300/70">(Sweepy standar)</span>
+              </span>
+            )}
           </div>
         </header>
 
-        <div className="grid md:grid-cols-3 gap-4">
-          {/* LEFT */}
-          <div className="md:col-span-1 space-y-4">
-            <section className={card}>
+        {/* Controls */}
+        <section className={card}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
               <div className={cardTitle}>Niche</div>
-              <div className={subText}>Niche menentukan preset (Sweepy tidak akan nyasar ke personal).</div>
+              <div className={subText}>Preset terkunci otomatis sesuai niche</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(NICHE_LABEL) as NicheKey[]).map((k) => (
+                <button
+                  key={k}
+                  className={k === niche ? btnPrimary : btnGhost}
+                  onClick={() => setNiche(k)}
+                >
+                  {NICHE_LABEL[k].split(" — ")[0]}
+                </button>
+              ))}
+            </div>
+          </div>
 
-              <div className="mt-3 grid grid-cols-1 gap-2">
-                {(Object.keys(NICHE_LABEL) as NicheKey[]).map((k) => (
-                  <button
-                    key={k}
-                    className={`${btn} ${niche === k ? "border-blue-300/70 bg-blue-900/20 ring-1 ring-blue-400/25" : ""}`}
-                    onClick={() => setNiche(k)}
-                  >
-                    {NICHE_LABEL[k]}
-                  </button>
-                ))}
+          <div className="mt-4 grid md:grid-cols-3 gap-3">
+            <div className="rounded-xl border border-blue-900/40 bg-blue-950/25 p-3">
+              <div className={cardTitle}>Niche Detail</div>
+              <div className="mt-2 text-sm text-blue-100">{NICHE_LABEL[niche]}</div>
+              <div className="mt-1 text-xs text-blue-300/70">
+                {niche === "colab"
+                  ? "Colab punya mode Nusantara (random Indonesia)."
+                  : "Personal/Sweepy hanya indoor/outdoor."}
               </div>
-            </section>
+            </div>
 
-            <section className={card}>
+            <div className="rounded-xl border border-blue-900/40 bg-blue-950/25 p-3">
               <div className={cardTitle}>Preset (Locked)</div>
-              <div className={subText}>Ditampilkan untuk info, dikunci sesuai niche.</div>
-
-              <div className="mt-3 grid grid-cols-1 gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 {presetButtons.map((p) => (
                   <button
                     key={p.key}
-                    className={`${btn} ${lockedPreset === p.key ? "border-blue-300/70 bg-blue-900/20 ring-1 ring-blue-400/25" : ""} ${
-                      p.locked ? "opacity-40 cursor-not-allowed" : ""
-                    }`}
-                    onClick={() => {}}
-                    title={p.locked ? p.reason : PRESET_LABEL[p.key]}
+                    className={p.locked ? "opacity-60 cursor-not-allowed " + btn : btnPrimary}
+                    disabled={p.locked}
+                    title={p.locked ? p.reason : "Aktif"}
+                    onClick={() => setPreset(p.key)}
                   >
-                    <div className="flex items-center justify-between">
-                      <span>{PRESET_LABEL[p.key]}</span>
-                      {p.locked ? <span className="text-xs">🔒</span> : null}
-                    </div>
+                    {PRESET_LABEL[p.key]}
                   </button>
                 ))}
               </div>
-            </section>
+              <div className="mt-2 text-xs text-blue-300/70">
+                Aktif: <b className="text-blue-100">{PRESET_LABEL[lockedPreset]}</b>
+              </div>
+            </div>
 
-            <section className={card}>
-              <div className={cardTitle}>Mode Lokasi</div>
-              <div className={subText}>Colab bisa Nusantara; lainnya indoor/outdoor.</div>
-
-              <div className="mt-3 grid grid-cols-1 gap-2">
+            <div className="rounded-xl border border-blue-900/40 bg-blue-950/25 p-3">
+              <div className={cardTitle}>Location Mode</div>
+              <div className="mt-2 flex flex-wrap gap-2">
                 {allowedModes.map((m) => (
                   <button
                     key={m}
-                    className={`${btn} ${locationMode === m ? "border-blue-300/70 bg-blue-900/20 ring-1 ring-blue-400/25" : ""}`}
+                    className={m === lockedMode ? btnPrimary : btnGhost}
                     onClick={() => setLocationMode(m)}
                   >
                     {LOCATION_LABEL[m]}
                   </button>
                 ))}
               </div>
-            </section>
-
-            <section className={card}>
-              <div className={cardTitle}>Auto Generate</div>
-              <div className={subText}>Mengisi Auto Block (fresh). Personal generator = NO Sweepy.</div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button className={btnPrimary} onClick={doAutoGenerate}>
-                  Auto Generate
-                </button>
-                <button
-                  className={btnGhost}
-                  onClick={() => {
-                    const ch = captionTags(niche);
-                    setCaption(ch.caption);
-                    setHashtags(ch.hashtags);
-                  }}
-                >
-                  Refresh Caption/Tags
-                </button>
+              <div className="mt-2 text-xs text-blue-300/70">
+                Mode tersedia: {allowedModes.map((m) => LOCATION_LABEL[m]).join(", ")}
               </div>
-
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <button className={`${btn} ${!canCopyAuto ? "opacity-40 cursor-not-allowed" : ""}`} disabled={!canCopyAuto} onClick={() => copyText(autoBlock)}>
-                  Copy Auto Block
-                </button>
-                <button
-                  className={`${btn} ${!canCopyAuto ? "opacity-40 cursor-not-allowed" : ""}`}
-                  disabled={!canCopyAuto}
-                  onClick={() => setExtra((prev) => clampText(`${prev}\n\n# AUTO BLOCK (appended)\n${autoBlock}`))}
-                >
-                  Append to Extra
-                </button>
-              </div>
-
-              <pre className={smallPre}>{autoBlock || "Belum ada Auto Block. Klik Auto Generate."}</pre>
-            </section>
-
-            <section className={card}>
-              <div className={cardTitle}>Caption + 5 Hashtags</div>
-              <div className="mt-2 text-sm text-slate-100">{caption}</div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {hashtags.map((t) => (
-                  <span key={t} className="text-xs px-2 py-1 rounded-full border border-blue-900/40 text-blue-200 bg-blue-900/10">
-                    {t}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-3 flex gap-2">
-                <button className={btn} onClick={() => copyText(`${caption}\n\n${hashtags.join(" ")}`)}>
-                  Copy Caption+Tags
-                </button>
-              </div>
-            </section>
-          </div>
-
-          {/* RIGHT */}
-          <div className="md:col-span-2 space-y-4">
-            <section className={card}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className={cardTitle}>Prompt Utama (Manual)</div>
-                  <div className={subText}>Template mengikuti niche + cast lock. Kamu bebas edit.</div>
-                </div>
-                <div className="flex gap-2">
-                  <button className={btn} onClick={() => setPromptUtama(defaultPromptUtama(niche, lockedMode))}>
-                    Reset Template
-                  </button>
-                  <button className={btn} onClick={() => setPromptUtama("")}>
-                    Clear
-                  </button>
-                </div>
-              </div>
-
-              <textarea
-                className={`${textarea} min-h-[280px]`}
-                value={promptUtama}
-                onChange={(e) => setPromptUtama(e.target.value)}
-                placeholder="Tulis prompt manual kamu di sini..."
-              />
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className={pill}>Hook 0–2 detik</span>
-                <span className={pill}>2 scene merged</span>
-                <span className={pill}>Strict cast lock</span>
-                <span className={pill}>Cut pas punchline</span>
-              </div>
-            </section>
-
-            <section className={card}>
-              <div className={cardTitle}>Extra (optional)</div>
-              <div className={subText}>Outfit, subtitle style, props, dll.</div>
-              <textarea
-                className={`${textarea} min-h-[120px]`}
-                value={extra}
-                onChange={(e) => setExtra(e.target.value)}
-                placeholder="Contoh: outfit hoodie hitam, subtitle minimal, close-up saat punchline..."
-              />
-            </section>
-
-            <section className={card}>
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <div className={cardTitle}>Final Prompt</div>
-                  <div className={subText}>Manual + Auto + Extra + aturan.</div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button className={`${btn} ${!canCopyFinal ? "opacity-40 cursor-not-allowed" : ""}`} disabled={!canCopyFinal} onClick={() => copyText(finalPrompt)}>
-                    Copy Final Prompt
-                  </button>
-                  <button className={btnPrimary} onClick={doSave}>
-                    Save
-                  </button>
-                </div>
-              </div>
-
-              <pre className={preBox}>{finalPrompt}</pre>
-            </section>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <section className={card}>
-                <div className="flex items-center justify-between">
-                  <div className={cardTitle}>Saved Prompts</div>
-                  <div className="text-xs text-blue-300/70">{saved.length}</div>
-                </div>
-
-                <div className="mt-3 space-y-2 max-h-[360px] overflow-auto pr-1">
-                  {saved.length === 0 ? (
-                    <div className="text-sm text-blue-300/70">Belum ada. Klik Save.</div>
-                  ) : (
-                    saved.map((s) => (
-                      <div key={s.id} className="rounded-xl border border-blue-900/40 p-3 bg-blue-950/25">
-                        <div className="text-sm font-medium text-slate-100">{s.title}</div>
-                        <div className="text-xs text-blue-300/70 mt-1">
-                          {NICHE_LABEL[s.niche]} • {LOCATION_LABEL[s.locationMode]} • {PRESET_LABEL[s.preset]}
-                        </div>
-
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <button className={btn} onClick={() => copyText(s.finalPrompt)}>
-                            Copy Prompt
-                          </button>
-                          <button className={btn} onClick={() => copyText(`${s.caption}\n\n${s.hashtags.join(" ")}`)}>
-                            Copy Caption+Tags
-                          </button>
-                          <button
-                            className={btn}
-                            onClick={() => {
-                              setNiche(s.niche);
-                              setLocationMode(s.locationMode);
-                              setPromptUtama(s.promptUtama);
-                              setAutoBlock(s.autoBlock);
-                              setExtra(s.extra);
-                            }}
-                          >
-                            Load
-                          </button>
-                          <button className={btn} onClick={() => removeSaved(s.id)}>
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
-
-              <section className={card}>
-                <div className="flex items-center justify-between">
-                  <div className={cardTitle}>History (Auto Block)</div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-xs text-blue-300/70">{history.length}</div>
-                    <button className={btn} onClick={clearHistory}>
-                      Clear
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-3 space-y-2 max-h-[360px] overflow-auto pr-1">
-                  {history.length === 0 ? (
-                    <div className="text-sm text-blue-300/70">Klik Auto Generate untuk mulai.</div>
-                  ) : (
-                    history.map((h) => (
-                      <div key={h.id} className="rounded-xl border border-blue-900/40 p-3 bg-blue-950/25">
-                        <div className="text-xs text-blue-300/70">
-                          {NICHE_LABEL[h.niche]} • {LOCATION_LABEL[h.locationMode]} • {PRESET_LABEL[h.preset]}
-                        </div>
-                        <pre className="mt-2 whitespace-pre-wrap text-xs bg-blue-950/40 border border-blue-900/40 rounded-xl p-2 text-slate-100">
-                          {h.autoBlock}
-                        </pre>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <button className={btn} onClick={() => copyText(h.autoBlock)}>
-                            Copy
-                          </button>
-                          <button className={btn} onClick={() => setAutoBlock(h.autoBlock)}>
-                            Use Auto Block
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </section>
             </div>
           </div>
-        </div>
+        </section>
 
-        <footer className="text-xs text-blue-300/60 pt-2">
-          Strict lock aktif: Personal tidak akan pernah menyebut Sweepy. Sweepy solo tidak akan menyebut @hanzonk26/@hanz26. Colab selalu @hanz26 + Sweepy nonverbal.
+        {/* Prompt Utama */}
+        <section className={card}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className={cardTitle}>Prompt Utama (Manual)</div>
+              <div className={subText}>Template auto akan muncul kalau masih kosong</div>
+            </div>
+            <button
+              className={btn}
+              onClick={() => setPromptUtama(defaultPromptUtama(niche, lockedMode))}
+              title="Reset template prompt utama"
+            >
+              Reset Template
+            </button>
+          </div>
+
+          <textarea
+            className={textarea}
+            value={promptUtama}
+            onChange={(e) => setPromptUtama(e.target.value)}
+            rows={10}
+            placeholder="Tulis prompt utama kamu di sini…"
+          />
+        </section>
+
+        {/* Auto Block */}
+        <section className={card}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className={cardTitle}>Auto Block (Fresh)</div>
+              <div className={subText}>Klik untuk random, tapi tetap patuh lock rules</div>
+            </div>
+            <div className="flex gap-2">
+              <button className={btnPrimary} onClick={doAutoGenerate}>
+                Auto Generate
+              </button>
+              <button className={btn} disabled={!canCopyAuto} onClick={() => copyText(autoBlock)}>
+                Copy Auto
+              </button>
+            </div>
+          </div>
+
+          <pre className={preBox}>{autoBlock.trim() || "(Klik Auto Generate)"}</pre>
+        </section>
+
+        {/* Extra */}
+        <section className={card}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className={cardTitle}>Extra (Optional)</div>
+              <div className={subText}>
+                Min Choi detail aktif untuk @hanzonk26 & Colab. Sweepy solo tetap standar.
+              </div>
+            </div>
+            <button className={btn} onClick={() => setExtra("")}>
+              Clear Extra Manual
+            </button>
+          </div>
+
+          {/* Min Choi Preset UI */}
+          {isMinChoi && (
+            <div className="mt-3 rounded-xl border border-blue-900/40 bg-blue-950/25 p-3">
+              <div className="text-xs text-blue-200 font-semibold">Min Choi Detail Preset</div>
+              <div className="text-xs text-blue-300/70 mt-1">
+                Aktif untuk <b>@hanzonk26</b> & <b>Colab (@hanz26 × Sweepy)</b>. Sweepy solo tetap standar.
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                {MINCHOI_ORDER.map((group) => (
+                  <label key={group} className="text-xs text-blue-200">
+                    {group}
+                    <select
+                      className="mt-2 w-full rounded-xl border border-blue-900/40 bg-blue-950/40 p-2 text-sm text-slate-100 outline-none focus:border-blue-400"
+                      value={minChoiSel[group] || ""}
+                      onChange={(e) =>
+                        setMinChoiSel((prev) => ({
+                          ...prev,
+                          [group]: e.target.value || undefined,
+                        }))
+                      }
+                    >
+                      <option value="">(none)</option>
+                      {MINCHOI_PRESETS[group].map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+
+              <div className="mt-3">
+                <div className="text-xs text-blue-200 font-semibold">Extra (auto)</div>
+                <pre className={smallPre}>{minChoiExtra || "(pilih preset di atas)"}</pre>
+                <div className="mt-2 flex gap-2 flex-wrap">
+                  <button
+                    className={btn}
+                    onClick={() => copyText(minChoiExtra)}
+                    disabled={!minChoiExtra.trim()}
+                    title="Copy Extra auto Min Choi"
+                  >
+                    Copy Min Choi Extra
+                  </button>
+                  <button
+                    className={btn}
+                    onClick={() => setMinChoiSel(MINCHOI_DEFAULT_BY_PRESET[lockedPreset] || {})}
+                    title="Reset Min Choi defaults"
+                  >
+                    Reset Min Choi Defaults
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Manual extra stays available for all */}
+          <textarea
+            className={textarea}
+            value={extra}
+            onChange={(e) => setExtra(e.target.value)}
+            rows={6}
+            placeholder="Tambahan manual (opsional). Misal: tone suara, pacing, overlay text, aturan khusus…"
+          />
+        </section>
+
+        {/* Output Final Prompt */}
+        <section className={card}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className={cardTitle}>Final Prompt (Copy ke Sora)</div>
+              <div className={subText}>Sudah gabung: Prompt Utama + Auto Block + Extra</div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button className={btnPrimary} disabled={!canCopyFinal} onClick={() => copyText(finalPrompt)}>
+                Copy Final Prompt
+              </button>
+              <button className={btn} onClick={doSave} title="Simpan ke Saved">
+                Save
+              </button>
+            </div>
+          </div>
+
+          <pre className={preBox}>{finalPrompt}</pre>
+        </section>
+
+        {/* Caption & Hashtags */}
+        <section className={card}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className={cardTitle}>Caption + Hashtags</div>
+              <div className={subText}>Auto sesuai niche (bisa copy cepat)</div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button className={btn} onClick={() => copyText(caption)}>
+                Copy Caption
+              </button>
+              <button className={btn} onClick={() => copyText(hashtags.join(" "))}>
+                Copy Hashtags
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 grid md:grid-cols-2 gap-3">
+            <div className="rounded-xl border border-blue-900/40 bg-blue-950/25 p-3">
+              <div className="text-xs text-blue-200 font-semibold">Caption</div>
+              <div className="mt-2 text-sm text-blue-100">{caption}</div>
+            </div>
+            <div className="rounded-xl border border-blue-900/40 bg-blue-950/25 p-3">
+              <div className="text-xs text-blue-200 font-semibold">Hashtags</div>
+              <div className="mt-2 text-sm text-blue-100">{hashtags.join(" ")}</div>
+            </div>
+          </div>
+        </section>
+
+        {/* Saved & History */}
+        <section className="grid md:grid-cols-2 gap-4">
+          {/* Saved */}
+          <div className={card}>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div className={cardTitle}>Saved</div>
+                <div className={subText}>Tersimpan di localStorage</div>
+              </div>
+              <button className={btn} onClick={() => copyText(JSON.stringify(saved, null, 2))} disabled={saved.length === 0}>
+                Copy JSON Saved
+              </button>
+            </div>
+
+            {saved.length === 0 ? (
+              <div className="mt-3 text-sm text-blue-300/70">Belum ada yang disimpan.</div>
+            ) : (
+              <div className="mt-3 space-y-3 max-h-[520px] overflow-auto pr-1">
+                {saved.map((s) => (
+                  <div key={s.id} className="rounded-xl border border-blue-900/40 bg-blue-950/25 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-semibold text-blue-100">{s.title}</div>
+                        <div className="text-xs text-blue-300/70 mt-1">
+                          {NICHE_LABEL[s.niche]} • {PRESET_LABEL[s.preset]} • {LOCATION_LABEL[s.locationMode]}
+                        </div>
+                      </div>
+                      <button className={btn} onClick={() => removeSaved(s.id)} title="Hapus">
+                        Delete
+                      </button>
+                    </div>
+
+                    <div className="mt-2 flex gap-2 flex-wrap">
+                      <button className={btnPrimary} onClick={() => copyText(s.finalPrompt)}>
+                        Copy Final
+                      </button>
+                      <button className={btn} onClick={() => copyText(s.caption)}>
+                        Copy Caption
+                      </button>
+                      <button className={btn} onClick={() => copyText(s.hashtags.join(" "))}>
+                        Copy Tags
+                      </button>
+                    </div>
+
+                    <details className="mt-2">
+                      <summary className="text-xs text-blue-200 cursor-pointer select-none">Preview</summary>
+                      <pre className={smallPre}>{s.finalPrompt}</pre>
+                    </details>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* History */}
+          <div className={card}>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div className={cardTitle}>History (Auto Generate)</div>
+                <div className={subText}>Hanya potongan Auto Block</div>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <button className={btn} onClick={clearHistory} disabled={history.length === 0}>
+                  Clear
+                </button>
+                <button className={btn} onClick={() => copyText(JSON.stringify(history, null, 2))} disabled={history.length === 0}>
+                  Copy JSON History
+                </button>
+              </div>
+            </div>
+
+            {history.length === 0 ? (
+              <div className="mt-3 text-sm text-blue-300/70">Belum ada history. Klik Auto Generate.</div>
+            ) : (
+              <div className="mt-3 space-y-3 max-h-[520px] overflow-auto pr-1">
+                {history.map((h) => (
+                  <div key={h.id} className="rounded-xl border border-blue-900/40 bg-blue-950/25 p-3">
+                    <div className="text-xs text-blue-300/70">
+                      {NICHE_LABEL[h.niche]} • {PRESET_LABEL[h.preset]} • {LOCATION_LABEL[h.locationMode]}
+                    </div>
+                    <pre className={smallPre}>{h.autoBlock}</pre>
+                    <div className="mt-2 flex gap-2 flex-wrap">
+                      <button className={btnPrimary} onClick={() => copyText(h.autoBlock)}>
+                        Copy Auto
+                      </button>
+                      <button
+                        className={btn}
+                        onClick={() => {
+                          setAutoBlock(h.autoBlock);
+                        }}
+                      >
+                        Load to Auto Block
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <footer className="py-8 text-center text-xs text-blue-300/50">
+          Sora Lite — Locked Cast v2 • Min Choi Preset ON (Personal + Colab), OFF (Sweepy)
         </footer>
       </div>
     </div>
