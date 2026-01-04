@@ -3,25 +3,27 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * Sora Lite — CLEAN UI (Dropdowns) + CLEAN JSON OUTPUT (FULL REPLACE)
+ * Sora Lite — CLEAN UI (Dropdowns) + CLEAN FINAL JSON (promptText + meta)
+ * FULL REPLACE page.tsx
  *
- * ✅ CLEAN PAGE:
+ * ✅ UI Clean:
  * - Niche: dropdown
- * - Preset model: dropdown (auto-locked by niche; options disabled if not allowed)
+ * - Preset: dropdown (locked by niche; other options disabled)
  * - Location mode: dropdown (options depend on niche)
  *
- * ✅ CLEAN OUTPUT:
- * - Final output is a compact JSON prompt (copy-friendly)
- * - Saved JSON stores the cleaned JSON output
+ * ✅ Output Clean:
+ * - finalJson = { v, preset, niche, mode, promptText, meta{...} }
+ * - promptText = 1 string siap copy ke Sora (rapi, gak berantakan)
+ * - meta = label + minChoi + caption + hashtags + opsional: auto/extra
  *
- * ✅ LOCK RULES (unchanged):
+ * ✅ LOCK RULES:
  * - Personal niches => ONLY @hanzonk26
  * - Sweepy niche    => ONLY @mockey.mo (Sweepy) nonverbal
  * - Colab niche     => @hanz26 + Sweepy nonverbal
  *
- * Min Choi detail presets:
- * - ACTIVE for @hanzonk26 + Colab (@hanz26)
- * - DISABLED for Sweepy solo
+ * Min Choi:
+ * - ON for @hanzonk26 + Colab (@hanz26)
+ * - OFF for Sweepy solo
  */
 
 type NicheKey =
@@ -45,7 +47,6 @@ type SavedPrompt = {
   autoBlock: string;
   extra: string;
 
-  // ✅ store clean JSON output
   finalJson: any;
   finalJsonText: string;
 
@@ -63,9 +64,9 @@ type HistoryItem = {
   createdAt: number;
 };
 
-// bump keys to avoid parsing older shape
-const LS_SAVED = "soraLite.savedPrompts.locked.v3";
-const LS_HISTORY = "soraLite.history.locked.v3";
+// bump keys
+const LS_SAVED = "soraLite.savedPrompts.locked.v4";
+const LS_HISTORY = "soraLite.history.locked.v4";
 
 const NICHE_LABEL: Record<NicheKey, string> = {
   personal_daily: "Personal — UGC Daily (@hanzonk26)",
@@ -179,14 +180,11 @@ function pickLocation(mode: LocationMode) {
 
 /** ---------------- Sweepy rules (nonverbal) ---------------- */
 
-function sweepyRule() {
-  return `RULE SWEEPY:
-- Sweepy (@mockey.mo) paham bahasa manusia tapi TIDAK berbicara bahasa manusia.
-- Respon hanya nonverbal: gesture, ekspresi, menunjuk, angguk/geleng, suara monyet kecil (chitter).
-- Subtitle hanya untuk kalimat manusia (bukan Sweepy).`;
+function sweepyRuleShort() {
+  return "Sweepy: nonverbal only (gesture/ekspresi/chitter), tidak bicara bahasa manusia.";
 }
 
-/** ---------------- Prompt Utama template (shorter, less noisy) ---------------- */
+/** ---------------- Prompt Utama template (short) ---------------- */
 
 function defaultPromptUtama(niche: NicheKey, mode: LocationMode) {
   const loc = pickLocation(mode);
@@ -197,8 +195,8 @@ function defaultPromptUtama(niche: NicheKey, mode: LocationMode) {
 Hook kuat 0–2 detik. Ending punchline/reveal bikin replay.
 Lokasi: ${loc}.
 Kamera: ${cam}.
-SCENE 1: Situasi normal + konflik kecil muncul cepat.
-SCENE 2: Konflik naik (masih believable) → punchline → cut pas lucu.
+Scene 1 (0–10s): situasi normal + konflik kecil.
+Scene 2 (10–20s): konflik naik → punchline → cut.
 `);
   }
 
@@ -207,8 +205,8 @@ SCENE 2: Konflik naik (masih believable) → punchline → cut pas lucu.
 Visual nonverbal, fokus gesture & ekspresi lucu (no dialogue Sweepy).
 Lokasi: ${loc}.
 Kamera: ${cam}.
-SCENE 1: Aksi harian “pintar” tapi lucu (hook cepat).
-SCENE 2: Makin absurd → punchline visual → cut pas lucu.
+Scene 1 (0–10s): aksi harian “pintar” tapi lucu.
+Scene 2 (10–20s): makin absurd → punchline visual → cut.
 `);
   }
 
@@ -217,8 +215,8 @@ SCENE 2: Makin absurd → punchline visual → cut pas lucu.
 Hook 0–2 detik. @hanz26 ngomong 1–2 kalimat singkat, Sweepy respon nonverbal.
 Lokasi: ${loc}.
 Kamera: ${cam}.
-SCENE 1: Konflik kecil.
-SCENE 2: Chaos naik → punchline → cut pas lucu.
+Scene 1 (0–10s): konflik kecil.
+Scene 2 (10–20s): chaos naik → punchline → cut.
 `);
 }
 
@@ -327,7 +325,6 @@ ${autoCommon(mode)}
 
 function autoSweepyDaily(mode: LocationMode) {
   return clampText(`
-${sweepyRule()}
 Base: ${pick(SWEEPY_BASE)}.
 Reaction: ${pick(SWEEPY_REACTIONS)}.
 Timing: hook 0–2s → build 2–10s → absurd peak 10–18s → punchline 18–20s.
@@ -338,7 +335,6 @@ ${autoCommon(mode)}
 function autoColab(mode: LocationMode) {
   const conflict = mode === "nusantara" ? pick(TRAVEL_CONFLICT) : pick(COLAB_CONFLICT);
   return clampText(`
-${sweepyRule()}
 Conflict: ${conflict}
 Punchline: ${pick(PUNCHLINES)}
 Timing: hook 0–2s → build 2–10s → chaos 10–18s → punchline 18–20s.
@@ -386,7 +382,7 @@ function captionTags(niche: NicheKey) {
   };
 }
 
-/** ---------------- Min Choi (compact lines) ---------------- */
+/** ---------------- Min Choi (kept as compact phrases) ---------------- */
 
 type MinChoiGroup =
   | "hair"
@@ -452,7 +448,11 @@ const MINCHOI_PRESETS: Record<MinChoiGroup, MinChoiItem[]> = {
     { id: "fun", label: "Fun comedy", text: "fun comedic timing" },
   ],
   quality: [
-    { id: "lock", label: "Quality lock", text: "ultra-realistic, natural movement, looks like real footage (no distortion)" },
+    {
+      id: "lock",
+      label: "Quality lock",
+      text: "ultra-realistic, natural movement, looks like real footage (no distortion)",
+    },
   ],
 };
 
@@ -477,16 +477,47 @@ const MINCHOI_DEFAULT: Record<PresetKey, Partial<Record<MinChoiGroup, string>>> 
     mood: "fun",
     quality: "lock",
   },
-  mockey: {}, // not used
+  mockey: {},
 };
 
-function getMinChoiLabel(group: MinChoiGroup, id?: string) {
+function getMinChoiText(group: MinChoiGroup, id?: string) {
   if (!id) return "";
   const item = MINCHOI_PRESETS[group].find((x) => x.id === id);
   return item?.text || "";
 }
 
-/** ---------------- CLEANERS -> CLEAN JSON ---------------- */
+function buildMinChoiObject(enabled: boolean, sel: Partial<Record<MinChoiGroup, string>>) {
+  if (!enabled) return null;
+  const obj: Record<string, string> = {};
+  (["hair", "outfit", "location", "action", "lighting", "camera", "mood", "quality"] as MinChoiGroup[]).forEach((g) => {
+    const t = getMinChoiText(g, sel[g]);
+    if (t && t.trim()) obj[g] = t.trim();
+  });
+  return Object.keys(obj).length ? obj : null;
+}
+
+function minChoiToLookLine(minChoi: Record<string, string> | null) {
+  if (!minChoi) return "";
+  // keep it compact for promptText
+  const camera = minChoi.camera ? `Lens: ${minChoi.camera}` : "";
+  const mood = minChoi.mood ? `Mood: ${minChoi.mood}` : "";
+  const quality = minChoi.quality ? `Quality: ${minChoi.quality}` : "";
+  const lighting = minChoi.lighting ? `Light: ${minChoi.lighting}` : "";
+  const out = [camera, lighting, mood, quality].filter(Boolean).join(" | ");
+  return out ? `Look: ${out}` : "";
+}
+
+function minChoiToStyleLine(minChoi: Record<string, string> | null) {
+  if (!minChoi) return "";
+  const hair = minChoi.hair ? `Hair: ${minChoi.hair}` : "";
+  const outfit = minChoi.outfit ? `Outfit: ${minChoi.outfit}` : "";
+  const loc = minChoi.location ? `Scene vibe: ${minChoi.location}` : "";
+  const act = minChoi.action ? `Action: ${minChoi.action}` : "";
+  const out = [hair, outfit, loc, act].filter(Boolean).join(" | ");
+  return out ? `Style: ${out}` : "";
+}
+
+/** ---------------- CLEANERS ---------------- */
 
 function compressAutoBlock(s: string) {
   const lines = s
@@ -497,24 +528,47 @@ function compressAutoBlock(s: string) {
     .filter((l) => !l.toLowerCase().startsWith("format:"))
     .filter((l) => !l.toLowerCase().startsWith("camera:"))
     .filter((l) => !l.toLowerCase().startsWith("location:"))
-    .filter((l) => !l.toLowerCase().startsWith("audio:"))
-    .filter((l) => !l.toLowerCase().startsWith("cast:"));
+    .filter((l) => !l.toLowerCase().startsWith("audio:"));
 
-  // keep only key lines
   const keys = ["Base:", "Conflict:", "Topic:", "Theme:", "Reaction:", "Punchline:", "Timing:", "Rules:", "Structure:"];
   const picked = lines.filter((l) => keys.some((k) => l.startsWith(k)));
   return clampText((picked.length ? picked : lines.slice(0, 6)).join("\n"));
 }
 
-function compressPrompt(s: string) {
-  const lines = s
+function extractLineStarts(lines: string[], starts: string[]) {
+  const out: string[] = [];
+  for (const s of starts) {
+    const hit = lines.find((l) => l.toLowerCase().startsWith(s.toLowerCase()));
+    if (hit) out.push(hit);
+  }
+  return out;
+}
+
+function compressPromptLines(niche: NicheKey, promptUtama: string) {
+  const lines = promptUtama
     .split("\n")
     .map((x) => x.trim())
     .filter(Boolean);
 
-  const keepStarts = ["Visual", "Hook", "Ending", "Lokasi:", "Kamera:", "SCENE"];
-  const picked = lines.filter((l) => keepStarts.some((k) => l.toLowerCase().startsWith(k.toLowerCase())));
-  return clampText((picked.length ? picked : lines.slice(0, 6)).join("\n"));
+  // Make sure we don't duplicate hook/ending etc.
+  const uniq: string[] = [];
+  for (const l of lines) {
+    if (!uniq.includes(l)) uniq.push(l);
+  }
+
+  if (niche === "sweepy_daily") {
+    // Sweepy: keep Visual + Lokasi + Kamera + Scene lines
+    const head = extractLineStarts(uniq, ["Visual", "Lokasi:", "Kamera:"]);
+    const scenes = uniq.filter((l) => l.toLowerCase().startsWith("scene")).slice(0, 2);
+    const base = head.length ? head : uniq.slice(0, 3);
+    return clampText([...base, ...scenes].join("\n"));
+  }
+
+  // personal / colab
+  const head = extractLineStarts(uniq, ["Hook", "Ending", "Lokasi:", "Kamera:"]);
+  const scenes = uniq.filter((l) => l.toLowerCase().startsWith("scene")).slice(0, 2);
+  const base = head.length ? head : uniq.slice(0, 4);
+  return clampText([...base, ...scenes].join("\n"));
 }
 
 function buildRules(niche: NicheKey) {
@@ -536,30 +590,45 @@ function buildRules(niche: NicheKey) {
   return out;
 }
 
-function buildMinChoiObject(
-  enabled: boolean,
-  sel: Partial<Record<MinChoiGroup, string>>
-) {
-  if (!enabled) return null;
+function buildPromptText(args: {
+  niche: NicheKey;
+  presetLabel: string;
+  locationModeLabel: string;
+  promptClean: string;
+  autoClean: string | null;
+  minChoiObj: Record<string, string> | null;
+}) {
+  const { niche, presetLabel, locationModeLabel, promptClean, autoClean, minChoiObj } = args;
 
-  const obj = {
-    hair: getMinChoiLabel("hair", sel.hair),
-    outfit: getMinChoiLabel("outfit", sel.outfit),
-    location: getMinChoiLabel("location", sel.location),
-    action: getMinChoiLabel("action", sel.action),
-    lighting: getMinChoiLabel("lighting", sel.lighting),
-    camera: getMinChoiLabel("camera", sel.camera),
-    mood: getMinChoiLabel("mood", sel.mood),
-    quality: getMinChoiLabel("quality", sel.quality),
-  };
+  // Header line that is still compact
+  const header =
+    niche === "colab"
+      ? `${presetLabel} + Sweepy (nonverbal) • ${locationModeLabel} • UGC vertical 9:16 • ~20s`
+      : niche === "sweepy_daily"
+      ? `${presetLabel} • ${locationModeLabel} • UGC vertical 9:16 • ~20s`
+      : `${presetLabel} • ${locationModeLabel} • UGC vertical 9:16 • ~20s`;
 
-  // remove empty values
-  const cleaned: Record<string, string> = {};
-  Object.entries(obj).forEach(([k, v]) => {
-    if (v && v.trim()) cleaned[k] = v.trim();
-  });
+  const lines: string[] = [];
+  lines.push(header);
+  lines.push(promptClean);
 
-  return Object.keys(cleaned).length ? cleaned : null;
+  if (niche === "sweepy_daily" || niche === "colab") {
+    lines.push(sweepyRuleShort());
+  }
+
+  // Min Choi compact -> Style + Look lines
+  const styleLine = minChoiToStyleLine(minChoiObj);
+  const lookLine = minChoiToLookLine(minChoiObj);
+  if (styleLine) lines.push(styleLine);
+  if (lookLine) lines.push(lookLine);
+
+  // Auto highlights (optional)
+  if (autoClean) lines.push(`Auto: ${autoClean.replace(/\n/g, " | ")}`);
+
+  // Always end with continuity / structure hint
+  lines.push("Note: 2 scene merged (0–10s + 10–20s), continuity lokasi/outfit/karakter.");
+
+  return clampText(lines.join("\n"));
 }
 
 /** ---------------- UI ---------------- */
@@ -577,6 +646,7 @@ export default function Page() {
 
   const [finalJson, setFinalJson] = useState<any>(null);
   const [finalJsonText, setFinalJsonText] = useState("");
+  const [promptTextOnly, setPromptTextOnly] = useState("");
 
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState<string[]>([]);
@@ -623,46 +693,62 @@ export default function Page() {
   }, [niche]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    // build clean JSON prompt
-    const promptClean = compressPrompt(promptUtama) || "(Isi Prompt Utama dulu)";
-    const autoClean = autoBlock.trim() ? compressAutoBlock(autoBlock) : "";
+    const promptClean = compressPromptLines(niche, promptUtama) || "(Isi Prompt Utama dulu)";
+    const autoClean = autoBlock.trim() ? compressAutoBlock(autoBlock) : null;
+
     const minChoiObj = buildMinChoiObject(minChoiEnabled, minChoiSel);
 
-    const out = {
-      preset: lockedPreset,
-      presetLabel: PRESET_LABEL[lockedPreset],
+    const promptText = buildPromptText({
       niche,
-      nicheLabel: NICHE_LABEL[niche],
-      locationMode: lockedMode,
+      presetLabel: PRESET_LABEL[lockedPreset],
       locationModeLabel: LOCATION_LABEL[lockedMode],
+      promptClean,
+      autoClean,
+      minChoiObj,
+    });
 
-      prompt: promptClean,
-      auto: autoClean || null,
+    setPromptTextOnly(promptText);
 
-      // keep extra manual small; if empty -> null
-      extra: extra.trim() ? clampText(extra).slice(0, 800) : null,
-
-      // only when enabled
+    const meta: any = {
+      labels: {
+        presetLabel: PRESET_LABEL[lockedPreset],
+        nicheLabel: NICHE_LABEL[niche],
+        modeLabel: LOCATION_LABEL[lockedMode],
+      },
       minChoi: minChoiObj,
-
-      rules: buildRules(niche),
-
-      // convenience content
       caption,
       hashtags,
+    };
+
+    // keep auto/extra optional in meta only (not clutter promptText)
+    if (autoClean) meta.auto = autoClean;
+    if (extra.trim()) meta.extra = clampText(extra).slice(0, 1200);
+
+    // remove null keys in meta
+    Object.keys(meta).forEach((k) => {
+      if (meta[k] == null) delete meta[k];
+    });
+
+    const out = {
+      v: 1,
+      preset: lockedPreset,
+      niche,
+      mode: lockedMode,
+      promptText,
+      meta,
     };
 
     setFinalJson(out);
     setFinalJsonText(JSON.stringify(out, null, 2));
   }, [
-    promptUtama,
-    autoBlock,
-    extra,
     niche,
     lockedMode,
     lockedPreset,
     minChoiEnabled,
     minChoiSel,
+    promptUtama,
+    autoBlock,
+    extra,
     caption,
     hashtags,
   ]);
@@ -758,9 +844,6 @@ export default function Page() {
   const selectCls =
     "mt-2 w-full rounded-xl border border-blue-900/40 bg-blue-950/40 p-2 text-sm text-slate-100 outline-none focus:border-blue-400";
 
-  const canCopyFinal = finalJsonText.trim().length > 0;
-
-  // dropdown options
   const nicheOptions: { key: NicheKey; label: string }[] = [
     { key: "personal_daily", label: "Personal — Daily" },
     { key: "personal_health", label: "Personal — Kesehatan" },
@@ -775,15 +858,29 @@ export default function Page() {
     { key: "hanz26", label: PRESET_LABEL.hanz26, enabled: lockedPreset === "hanz26" },
   ];
 
+  const minChoiGroups: { key: MinChoiGroup; label: string }[] = [
+    { key: "hair", label: "Hair" },
+    { key: "outfit", label: "Outfit" },
+    { key: "location", label: "Scene vibe" },
+    { key: "action", label: "Action" },
+    { key: "lighting", label: "Lighting" },
+    { key: "camera", label: "Camera/Lens" },
+    { key: "mood", label: "Mood" },
+    { key: "quality", label: "Quality lock" },
+  ];
+
+  const canCopyJson = finalJsonText.trim().length > 0;
+  const canCopyPrompt = promptTextOnly.trim().length > 0;
+
   return (
     <div className={shell}>
       <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-4">
         <header className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-2xl md:text-3xl font-semibold">Sora Lite — Clean UI + Clean JSON</h1>
+              <h1 className="text-2xl md:text-3xl font-semibold">Sora Lite — Clean PromptText + Meta JSON</h1>
               <p className="text-sm text-blue-300/60 mt-1">
-                Niche & Preset dropdown • Output: compact JSON prompt
+                Dropdown UI • Output: promptText (copy ke Sora) + meta (arsip)
               </p>
             </div>
             <div className="hidden md:flex flex-col items-end gap-2">
@@ -811,10 +908,9 @@ export default function Page() {
           </div>
         </header>
 
-        {/* Clean Controls */}
+        {/* Controls */}
         <section className={card}>
           <div className="grid md:grid-cols-3 gap-3">
-            {/* Niche dropdown */}
             <div className="rounded-xl border border-blue-900/40 bg-blue-950/25 p-3">
               <div className={cardTitle}>Niche</div>
               <div className={subText}>Pilih niche (preset terkunci otomatis)</div>
@@ -827,10 +923,9 @@ export default function Page() {
               </select>
             </div>
 
-            {/* Preset dropdown (locked, options disabled) */}
             <div className="rounded-xl border border-blue-900/40 bg-blue-950/25 p-3">
               <div className={cardTitle}>Preset Model</div>
-              <div className={subText}>Dropdown tetap ada, tapi dikunci oleh niche</div>
+              <div className={subText}>Dropdown ada, tapi opsi lain locked</div>
               <select className={selectCls} value={preset} onChange={(e) => setPreset(e.target.value as PresetKey)}>
                 {presetOptions.map((p) => (
                   <option key={p.key} value={p.key} disabled={!p.enabled}>
@@ -843,7 +938,6 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Location mode dropdown */}
             <div className="rounded-xl border border-blue-900/40 bg-blue-950/25 p-3">
               <div className={cardTitle}>Location Mode</div>
               <div className={subText}>Pilihan menyesuaikan niche</div>
@@ -867,7 +961,7 @@ export default function Page() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className={cardTitle}>Prompt Utama (Manual)</div>
-              <div className={subText}>Template pendek otomatis (lebih clean)</div>
+              <div className={subText}>Template pendek (biar clean)</div>
             </div>
             <button className={btn} onClick={() => setPromptUtama(defaultPromptUtama(niche, lockedMode))}>
               Reset Template
@@ -879,7 +973,7 @@ export default function Page() {
             value={promptUtama}
             onChange={(e) => setPromptUtama(e.target.value)}
             rows={6}
-            placeholder="Tulis prompt utama di sini…"
+            placeholder="Tulis prompt utama…"
           />
         </section>
 
@@ -888,14 +982,14 @@ export default function Page() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className={cardTitle}>Auto Block</div>
-              <div className={subText}>Klik untuk random (tetap patuh aturan cast)</div>
+              <div className={subText}>Random cepat, tetap patuh lock</div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button className={btnPrimary} onClick={doAutoGenerate}>
                 Auto Generate
               </button>
               <button className={btn} onClick={() => copyText(autoBlock)} disabled={!autoBlock.trim()}>
-                Copy Auto
+                Copy Auto (raw)
               </button>
             </div>
           </div>
@@ -903,32 +997,30 @@ export default function Page() {
           <pre className={preBox}>{autoBlock.trim() || "(Klik Auto Generate)"}</pre>
         </section>
 
-        {/* Min Choi (only for @hanzonk26 + @hanz26) */}
+        {/* Min Choi */}
         {minChoiEnabled && (
           <section className={card}>
             <div>
               <div className={cardTitle}>Min Choi Detail (Optional)</div>
-              <div className={subText}>Dipakai untuk Personal + Colab. Sweepy solo: OFF.</div>
+              <div className={subText}>ON untuk Personal + Colab. Sweepy solo: OFF.</div>
             </div>
 
             <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-              {(
-                ["hair", "outfit", "location", "action", "lighting", "camera", "mood", "quality"] as MinChoiGroup[]
-              ).map((group) => (
-                <label key={group} className="text-xs text-blue-200">
-                  {group}
+              {minChoiGroups.map((g) => (
+                <label key={g.key} className="text-xs text-blue-200">
+                  {g.label}
                   <select
                     className={selectCls}
-                    value={minChoiSel[group] || ""}
+                    value={minChoiSel[g.key] || ""}
                     onChange={(e) =>
                       setMinChoiSel((prev) => ({
                         ...prev,
-                        [group]: e.target.value || undefined,
+                        [g.key]: e.target.value || undefined,
                       }))
                     }
                   >
                     <option value="">(none)</option>
-                    {MINCHOI_PRESETS[group].map((x) => (
+                    {MINCHOI_PRESETS[g.key].map((x) => (
                       <option key={x.id} value={x.id}>
                         {x.label}
                       </option>
@@ -939,11 +1031,7 @@ export default function Page() {
             </div>
 
             <div className="mt-3 flex gap-2 flex-wrap">
-              <button
-                className={btn}
-                onClick={() => setMinChoiSel(MINCHOI_DEFAULT[lockedPreset] || {})}
-                title="Reset ke default preset"
-              >
+              <button className={btn} onClick={() => setMinChoiSel(MINCHOI_DEFAULT[lockedPreset] || {})}>
                 Reset Min Choi Defaults
               </button>
             </div>
@@ -955,7 +1043,7 @@ export default function Page() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className={cardTitle}>Extra (Manual, optional)</div>
-              <div className={subText}>Akan masuk ke JSON sebagai extra (ringkas)</div>
+              <div className={subText}>Masuk ke meta.extra (bukan ke promptText)</div>
             </div>
             <button className={btn} onClick={() => setExtra("")}>
               Clear
@@ -967,19 +1055,36 @@ export default function Page() {
             value={extra}
             onChange={(e) => setExtra(e.target.value)}
             rows={4}
-            placeholder="Tambahan singkat… (misal overlay text, pacing, dll)"
+            placeholder="Tambahan singkat…"
           />
         </section>
 
-        {/* FINAL JSON OUTPUT */}
+        {/* OUTPUT: PromptText */}
         <section className={card}>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <div className={cardTitle}>Final JSON Prompt (Clean)</div>
-              <div className={subText}>Copy ini ke tools / simpan. Ini sudah rapi & minim noise.</div>
+              <div className={cardTitle}>PromptText (Copy ke Sora)</div>
+              <div className={subText}>Ini yang kamu tempel ke Sora. Sudah rapih & padat.</div>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <button className={btnPrimary} disabled={!canCopyFinal} onClick={() => copyText(finalJsonText)}>
+              <button className={btnPrimary} disabled={!canCopyPrompt} onClick={() => copyText(promptTextOnly)}>
+                Copy PromptText
+              </button>
+            </div>
+          </div>
+
+          <pre className={preBox}>{promptTextOnly}</pre>
+        </section>
+
+        {/* OUTPUT: Final JSON */}
+        <section className={card}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className={cardTitle}>Final JSON (Clean)</div>
+              <div className={subText}>Berisi promptText + meta (arsip). Tidak berantakan.</div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button className={btnPrimary} disabled={!canCopyJson} onClick={() => copyText(finalJsonText)}>
                 Copy Final JSON
               </button>
               <button className={btn} onClick={doSave}>
@@ -991,12 +1096,12 @@ export default function Page() {
           <pre className={preBox}>{finalJsonText}</pre>
         </section>
 
-        {/* Caption & Hashtags quick copy */}
+        {/* Caption & Hashtags quick */}
         <section className={card}>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className={cardTitle}>Caption + Hashtags</div>
-              <div className={subText}>Sudah ikut masuk JSON juga</div>
+              <div className={subText}>Sudah ikut ke meta juga</div>
             </div>
             <div className="flex gap-2 flex-wrap">
               <button className={btn} onClick={() => copyText(caption)}>
@@ -1026,7 +1131,7 @@ export default function Page() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <div className={cardTitle}>Saved</div>
-                <div className={subText}>Menyimpan JSON output yang sudah clean</div>
+                <div className={subText}>Menyimpan JSON clean (promptText + meta)</div>
               </div>
               <button className={btn} onClick={() => copyText(JSON.stringify(saved, null, 2))} disabled={saved.length === 0}>
                 Copy JSON Saved
@@ -1055,17 +1160,14 @@ export default function Page() {
                       <button className={btnPrimary} onClick={() => copyText(s.finalJsonText)}>
                         Copy Final JSON
                       </button>
-                      <button className={btn} onClick={() => copyText(s.caption)}>
-                        Copy Caption
-                      </button>
-                      <button className={btn} onClick={() => copyText(s.hashtags.join(" "))}>
-                        Copy Tags
+                      <button className={btn} onClick={() => copyText(s.finalJson?.promptText || "")}>
+                        Copy PromptText
                       </button>
                     </div>
 
                     <details className="mt-2">
-                      <summary className="text-xs text-blue-200 cursor-pointer select-none">Preview JSON</summary>
-                      <pre className={smallPre}>{s.finalJsonText}</pre>
+                      <summary className="text-xs text-blue-200 cursor-pointer select-none">Preview PromptText</summary>
+                      <pre className={smallPre}>{s.finalJson?.promptText || s.finalJsonText}</pre>
                     </details>
                   </div>
                 ))}
@@ -1076,8 +1178,8 @@ export default function Page() {
           <div className={card}>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <div className={cardTitle}>History (Auto)</div>
-                <div className={subText}>Menyimpan auto block raw untuk referensi</div>
+                <div className={cardTitle}>History (Auto raw)</div>
+                <div className={subText}>Untuk referensi variasi</div>
               </div>
               <div className="flex gap-2 flex-wrap">
                 <button className={btn} onClick={clearHistory} disabled={history.length === 0}>
@@ -1115,7 +1217,7 @@ export default function Page() {
         </section>
 
         <footer className="py-8 text-center text-xs text-blue-300/50">
-          Sora Lite — Clean UI (dropdowns) • Clean JSON output • Locked Cast enforced
+          Sora Lite — Clean promptText + meta JSON • Locked cast enforced
         </footer>
       </div>
     </div>
